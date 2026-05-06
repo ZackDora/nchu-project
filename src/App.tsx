@@ -12,7 +12,7 @@ function App() {
   return (
     <Routes>
       <Route
-        path="/*"
+        path="*"
         element={
           <>
             <section id="center">
