@@ -692,6 +692,7 @@ export function CreditCalculator() {
   const [selectedCategorySummary, setSelectedCategorySummary] = useState("");
   const [showExternalCreditCourses, setShowExternalCreditCourses] = useState(false);
   const [selectedDfllRequirementDetail, setSelectedDfllRequirementDetail] = useState("");
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState("");
   const [selectedProgramPlanId, setSelectedProgramPlanId] = useState(optionalProgramPlans[0]?.id ?? "");
   const requirementProfile = useMemo(() => getRequirementProfile(selectedDepartment), [selectedDepartment]);
 
@@ -757,13 +758,14 @@ export function CreditCalculator() {
           plan.id === digitalHumanitiesProgramId
             ? planCourses.filter((course) => isDigitalHumanitiesProgramCourse(course) && normalizeGrade(course.grade) !== "抵")
             : planCourses;
+        const countedPlanCourses = programRecognizedCourses.filter((course) => countableCredits(course, requirementProfile) > 0);
         const completed =
           plan.id === defaultPlanId
             ? primaryCreditAudit.completed
-            : programRecognizedCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
+            : countedPlanCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
         const nonRequiredCredits =
           plan.id === digitalHumanitiesProgramId
-            ? programRecognizedCourses
+            ? countedPlanCourses
               .filter((course) => !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus))
               .reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0)
             : 0;
@@ -781,10 +783,11 @@ export function CreditCalculator() {
           remaining: requirementRemaining,
           progress: Math.min((completed / plan.requiredCredits) * 100, 100),
           nonRequiredCredits,
+          countedCourses: countedPlanCourses,
           unrecognizedCourses,
         };
       }),
-    [admissionYear, courses, plans, primaryCreditAudit, requirementProfile],
+    [admissionYear, courses, plans, primaryCreditAudit, requirementProfile, studentStatus],
   );
 
   const nonGraduationRequirement = useMemo(() => {
@@ -1664,7 +1667,13 @@ export function CreditCalculator() {
           <div className="space-y-3">
             {planProgress.map((plan) => (
               <div key={plan.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlanDetail((current) => (current === plan.id ? "" : plan.id))}
+                  className={`mb-2 flex w-full items-start justify-between gap-3 rounded-md text-left transition-colors ${
+                    selectedPlanDetail === plan.id ? "bg-blue-50 p-2 dark:bg-blue-950/40" : ""
+                  }`}
+                >
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{planTypeLabels[plan.type]}</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">{plan.name}</p>
@@ -1673,7 +1682,7 @@ export function CreditCalculator() {
                     )}
                   </div>
                   <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{plan.remaining} 缺</p>
-                </div>
+                </button>
                 <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 mb-2">
                   <div className="h-2 rounded-full bg-blue-600 dark:bg-blue-400" style={{ width: `${plan.progress}%` }} />
                 </div>
@@ -1687,6 +1696,39 @@ export function CreditCalculator() {
                       <p className="text-red-600 dark:text-red-400">
                         {plan.unrecognizedCourses.length} 門課未列入學程採計或為抵免課程
                       </p>
+                    )}
+                  </div>
+                )}
+                {selectedPlanDetail === plan.id && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">已採計課程</p>
+                    {plan.countedCourses.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">目前沒有採計到這個方案的課程。</p>
+                    ) : (
+                      plan.countedCourses.map((course, index) => {
+                        const isNonRequiredProgramCourse =
+                          plan.id === digitalHumanitiesProgramId &&
+                          !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus);
+                        return (
+                          <div
+                            key={`${course.courseNo}-${course.name}-${course.semester}-${index}`}
+                            className="rounded-md border border-gray-100 p-3 text-sm dark:border-gray-700"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="font-medium text-gray-900 dark:text-white">{course.name || "未命名課程"}</p>
+                              <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                                {countableCredits(course, requirementProfile)} 學分
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {course.semester || "未選學期"}{course.offeredBy ? ` / ${course.offeredBy}` : ""}
+                            </p>
+                            {isNonRequiredProgramCourse && (
+                              <p className="mt-1 text-xs text-green-700 dark:text-green-300">列入非原主修/雙主修必修學分</p>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 )}

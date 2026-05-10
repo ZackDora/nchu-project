@@ -23,6 +23,12 @@ const isNonGraduationCredit = (course: { category: string; name: string; type: s
 const isUncountedOutcomeCourse = (course: { score: string; grade: string }) =>
   course.score.toUpperCase() === "W" || course.grade.toUpperCase() === "W" || course.grade.toUpperCase() === "F";
 
+const getSemesterOrder = (semester: string) => {
+  const match = semester.match(/^(\d{3})-(1|2)$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return Number(match[1]) * 10 + Number(match[2]);
+};
+
 export function CourseAnalysis() {
   const { courses, profile } = useTranscript();
 
@@ -47,9 +53,14 @@ export function CourseAnalysis() {
     return {
       completedCredits,
       gpa,
-      bySemester: Object.entries(bySemester).sort(([a], [b]) => a.localeCompare(b)),
+      bySemester: Object.entries(bySemester).sort(([a], [b]) => getSemesterOrder(a) - getSemesterOrder(b)),
     };
   }, [courses]);
+
+  const chronologicalCourses = useMemo(
+    () => [...courses].sort((a, b) => getSemesterOrder(a.semester) - getSemesterOrder(b.semester)),
+    [courses],
+  );
 
   if (courses.length === 0) {
     return (
@@ -65,13 +76,13 @@ export function CourseAnalysis() {
           <FileUp className="mx-auto mb-3 text-blue-600 dark:text-blue-400" size={32} />
           <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">尚未有可分析的成績資料</p>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            請先上傳歷年成績查詢 PDF，系統會用辨識出的課程資料產生分析。
+            請先在學分計算頁貼上學生歷年成績查詢內容，系統會用匯入的課程資料產生分析。
           </p>
           <Link
             to="/"
             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600"
           >
-            前往上傳
+            前往匯入
           </Link>
         </div>
       </div>
@@ -130,7 +141,7 @@ export function CourseAnalysis() {
       </div>
 
       <div className="space-y-3">
-        {courses.map((course, index) => (
+        {chronologicalCourses.map((course, index) => (
           <div
             key={`${course.semester}-${course.name}-${index}`}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors"
