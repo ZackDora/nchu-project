@@ -98,7 +98,11 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
     "核心素養",
     "資訊素養",
     "全校可選修",
+    "全校英外語",
+    "外國語文",
+    "敘事表達/大學國文",
     "專業領域微課程",
+    "服務學習",
     "體育",
   ];
 
@@ -145,7 +149,7 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
     /(人文領域|社會科學領域|自然科學領域|核心素養|通識自由選|全校可選修|統合領域|專業領域微課程|通識中心|語言中心|體育室|學務處|外文系|Department|College|Office|Center|Humanistic|General Education|Category)/i.test(line);
 
   const findWrappedCategory = (chineseLines: string[]) => {
-    const domainLabels = ["統合領域", "人文領域", "社會科學領域", "自然科學領域", "核心素養", "資訊素養", "專業領域微課程", "體育"];
+    const domainLabels = ["統合領域", "人文領域", "社會科學領域", "自然科學領域", "核心素養", "資訊素養", "專業領域微課程", "全校英外語", "外國語文", "敘事表達/大學國文", "服務學習", "體育"];
 
     for (let start = 0; start < chineseLines.length; start += 1) {
       let joined = "";
@@ -183,9 +187,13 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
     const category =
       categoryMatch?.label === "體育"
         ? profile.nonGraduationRequirement?.category ?? "體育/服務學習"
+        : categoryMatch?.label === "服務學習"
+          ? profile.nonGraduationRequirement?.category ?? "體育/服務學習"
         : categoryMatch?.label === "全校可選修"
           ? "其他"
-          : categoryMatch?.label;
+          : categoryMatch?.label === "全校英外語" || categoryMatch?.label === "外國語文"
+            ? "語言素養課程"
+        : categoryMatch?.label;
     const offeredByIndex = chineseLines.findIndex((line) => /(?:夜外文|系|所|學程|中心|院|體育室|學務處)$/.test(line) && line !== category);
     const offeredBy = offeredByIndex >= 0 ? cleanOfferedBy(chineseLines[offeredByIndex]) : "";
     const nameEnd =
@@ -519,14 +527,43 @@ const getParsedCourseKey = (course: TranscriptCourse) =>
     normalizeGrade(course.grade),
   ].join("|");
 
+const getMergeCourseKey = (course: TranscriptCourse) =>
+  course.courseNo
+    ? `course-no:${course.courseNo}`
+    : `course:${course.name.replace(/\s+/g, "")}|${course.credits}|${normalizeGrade(course.grade)}`;
+
+const getParseQualityScore = (course: TranscriptCourse) => {
+  const typeOnlyName = /^(Req|Elec|Gen|P\.?E\.?|Service)$/i.test(course.name);
+  return [
+    typeOnlyName ? -20 : 0,
+    /[\u4e00-\u9fff]/.test(course.name) ? 20 : 0,
+    course.name.length,
+    course.category ? 5 : 0,
+    course.offeredBy ? 3 : 0,
+    course.type ? 2 : 0,
+  ].reduce((sum, score) => sum + score, 0);
+};
+
 export const parsePastedCourses = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
   const structuredCourses = parseStructuredRows(text, profile);
   const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
   const mobileLabelValueCourses = parseNchuMobileLabelValueTranscript(text, profile);
   const mobileWrappedTableCourses = parseNchuMobileWrappedTableTranscript(text, profile);
   const mobileCompactCourses = parseNchuMobileCompactTranscript(text, profile);
+  const nchuCourses = [...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses, ...mobileCompactCourses];
+  const candidateCourses = nchuCourses.length > 0 ? nchuCourses : structuredCourses;
+  const bestCourses = new Map<string, TranscriptCourse>();
+
+  for (const course of candidateCourses) {
+    const key = getMergeCourseKey(course);
+    const current = bestCourses.get(key);
+    if (!current || getParseQualityScore(course) > getParseQualityScore(current)) {
+      bestCourses.set(key, course);
+    }
+  }
+
   const seen = new Set<string>();
-  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses, ...mobileCompactCourses].filter((course) => {
+  return Array.from(bestCourses.values()).filter((course) => {
     const key = getParsedCourseKey(course);
     if (seen.has(key)) return false;
     seen.add(key);

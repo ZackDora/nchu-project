@@ -319,7 +319,149 @@ Freshman English	-
   assert.equal(separatedTransferCourses[11].credits, 2);
   assert.equal(separatedTransferCourses[11].grade, "抵");
 
-  console.log("transcript parser tests passed: 62");
+  const narrowWrappedTranscript = `
+0313 通
+Gen
+語言、文化與溝通
+Language, Culture
+and Communication
+人文領域
+Humanistic
+Category
+通識中心
+General Education
+Center
+2 90 A+ Y
+0456 通
+Gen
+數位媒體與第二外
+語習得
+Digital Media and
+Second Language
+Acquisition
+社會科學領
+域
+Social
+Science
+Category
+通識中心
+General Education
+Center
+2 95 A+ Y
+0959 選
+Elec
+實用華語(二)
+Practical Chinese(II)
+全校可選修
+Other
+Elective
+Course
+語言中心
+Language Center
+3 96 A+ N
+1062 必
+Req
+英語口語訓練(一)
+English Oral Training
+(I)
+-
+外文系
+Department of
+Foreign
+Languages and
+Literatures
+2 92 A+ N
+1752 必
+Req
+大學國文
+College Chinese
+敘事表達/
+大學國文
+College
+Chinese
+通識中心
+General Education
+Center
+2 88 A N
+1903 必
+Req
+數位人文概論
+Introduction to
+Digital Humanities
+-
+文學院
+College of Liberal
+Arts
+2 83 A- N
+1904 必
+Req
+歷史與電影
+History and Films -
+文學院
+College of Liberal
+Arts
+1 89 A Y
+1905 必
+Req
+台灣語言與文化
+Taiwanese Languages
+and Cultures
+-
+文學院
+College of Liberal
+Arts
+1 90 A+ Y
+2224 選
+Elec
+商業談判
+Commercial
+Negotiation
+-
+行銷系
+Department of
+Marketing
+3 86 A Y
+6112 選
+Elec
+中國商法導論專題
+Introduction to
+Chinese Business Law
+-
+法律系
+Department of
+Law
+2 80 A- Y
+9996 必
+Req
+英文能力檢定及輔
+導
+English Proficiency
+Requirement
+全校英外語
+English
+Language
+Courses
+語言中心
+Language Center
+0 P N
+抵 通
+Gen
+大一英文
+Freshman English - - 2 抵
+`;
+
+  const narrowWrappedCourses = parsePastedCourses(narrowWrappedTranscript, profile);
+  assert.equal(narrowWrappedCourses.length, 12);
+  assert.equal(narrowWrappedCourses[1].name, "數位媒體與第二外語習得");
+  assert.equal(narrowWrappedCourses[1].category, "社會科學領域");
+  assert.equal(narrowWrappedCourses[4].name, "大學國文");
+  assert.equal(narrowWrappedCourses[4].category, "敘事表達/大學國文");
+  assert.equal(narrowWrappedCourses[10].name, "英文能力檢定及輔導");
+  assert.equal(narrowWrappedCourses[10].category, "語言素養課程");
+  assert.equal(narrowWrappedCourses[11].name, "大一英文");
+  assert.equal(narrowWrappedCourses[11].grade, "抵");
+
+  console.log("transcript parser tests passed: 70");
 } finally {
   await server.close();
 }
