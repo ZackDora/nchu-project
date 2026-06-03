@@ -39,8 +39,13 @@ const manualSteps = [
   },
   {
     icon: MousePointerClick,
-    title: "選擇正確學期並複製課程",
-    description: "選好要匯入的學期，複製該學年或該學期對應的所有課程內容。",
+    title: "在本網站選擇正確學期",
+    description: "回到學分計算頁，在「貼上課程學期」選擇你準備匯入的正確學期。",
+  },
+  {
+    icon: FileText,
+    title: "在歷年成績複製課程內容",
+    description: "回到學校的「歷年成績」頁面，複製同一個學年或學期對應的所有課程內容。",
   },
   {
     icon: PencilLine,
