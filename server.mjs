@@ -16,6 +16,23 @@ const libraryEventsUrl = "https://cal.lib.nchu.edu.tw/";
 const dfllGraduationUrl = "https://dfll.nchu.edu.tw/news_detail.php?Key=224";
 const textDecoder = new TextDecoder("utf-8");
 const maxExternalCourseCards = 6;
+const safetyRedirectText = [
+  "I can’t help with that request.",
+  "",
+  "This tool is for learning planning, school resources, and skill development. Please rephrase it as a safe learning goal.",
+].join("\n");
+const unsafeRequestPatterns = [
+  /(?:how|teach|show|help).{0,40}(?:kill|stab|shoot|poison|bomb|weapon|explosive)/i,
+  /(?:製作|教我|如何).{0,20}(?:炸彈|武器|毒藥|殺人|傷害)/,
+  /(?:suicide|self[-\s]?harm|kill myself|end my life|自殺|自殘|輕生).{0,40}(?:method|方法|how|怎麼|教)/i,
+  /(?:hack|phish|malware|ransomware|steal password|credential|ddos|bypass login|crack account)/i,
+  /(?:駭入|釣魚|惡意程式|勒索軟體|偷密碼|盜帳號|繞過登入|破解帳號)/,
+  /(?:cheat|作弊|代寫|幫我寫考試|考試答案|作業答案|plagiar)/i,
+  /(?:make|sell|buy|traffic).{0,30}(?:drugs|cocaine|meth|heroin|毒品|違禁藥)/i,
+  /(?:hate|racial slur|種族歧視|仇恨).{0,40}(?:speech|attack|罵|攻擊)/i,
+  /(?:api key|password|private key|secret|token|密碼|金鑰|權杖).{0,30}(?:steal|reveal|extract|偷|取得|破解)/i,
+];
+const isUnsafeLearningRequest = (message) => unsafeRequestPatterns.some((pattern) => pattern.test(message));
 
 const sourceCatalog = [
   {
@@ -318,6 +335,7 @@ const getEdxCourses = async (topic) => {
 };
 
 const getExternalCourses = async (topic) => {
+  if (isUnsafeLearningRequest(topic)) return [];
   const [courseraResults, edxResults] = await Promise.allSettled([
     getCourseraCourses(topic),
     getEdxCourses(topic),
@@ -345,9 +363,11 @@ const cleanAiText = (text) =>
     .trim();
 
 const createAiAnswer = async (body) => {
-  if (!groqApiKey) throw new Error("GROQ_API_KEY is not configured");
-
   const payload = JSON.parse(body || "{}");
+  if (isUnsafeLearningRequest(payload.question ?? "")) {
+    return safetyRedirectText;
+  }
+  if (!groqApiKey) throw new Error("GROQ_API_KEY is not configured");
   const systemInstruction = [
     "You are an NCHU student learning advisor chatbot.",
     "Use only provided NCHU data for specific NCHU course, event, policy, and source details.",
