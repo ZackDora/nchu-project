@@ -41,6 +41,12 @@ const manualSteps = [
     icon: FileText,
     title: "在歷年成績複製課程內容",
     description: "回到學校的「歷年成績」頁面，複製同一個學年或學期對應的所有課程內容。",
+    images: [
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-4.png`,
+        alt: "在歷年成績頁面選取並複製課程內容",
+      },
+    ],
   },
   {
     icon: MousePointerClick,
