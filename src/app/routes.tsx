@@ -3,6 +3,8 @@ import { RootLayout } from "./components/RootLayout";
 import { CreditCalculator } from "./components/CreditCalculator";
 import { CourseAnalysis } from "./components/CourseAnalysis";
 
+const routerBaseName = import.meta.env.BASE_URL === "/" ? undefined : import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export const router = createBrowserRouter(
   [
     {
@@ -15,6 +17,6 @@ export const router = createBrowserRouter(
     },
   ],
   {
-    basename: "/nchu-project",
+    basename: routerBaseName,
   }
 );

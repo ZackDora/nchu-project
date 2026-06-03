@@ -10,10 +10,10 @@
 
 [[redirects]]
   from = "/nchu-project/*"
-  to = "/nchu-project/index.html"
+  to = "/index.html"
   status = 200
 
 [[redirects]]
   from = "/*"
-  to = "/nchu-project/index.html"
+  to = "/index.html"
   status = 200
