@@ -108,7 +108,7 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
 
   const isCourseStart = (line: string) => /^([A-Z]?\d{4,6}|抵)\s*(必|選|通|體|服|Req|Elec|Gen|P\.?E\.?|Service)?$/i.test(line);
   const parseScoreLine = (line: string) => {
-    const fullMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s+([YN-])(?:\s|$)/i);
+    const fullMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s*([A-F][+-]?|P|W|抵|-)\s*([YN-])(?:\s|$)/i);
     if (fullMatch) {
       return {
         credits: Number(fullMatch[1]),
@@ -118,7 +118,7 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
       };
     }
 
-    const noGpaMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(P|I|W|抵|-)\s+([YN-])(?:\s|$)/i);
+    const noGpaMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(P|I|W|抵|-)\s*([YN-])(?:\s|$)/i);
     if (noGpaMatch) {
       const score = noGpaMatch[2];
       return {
@@ -129,7 +129,7 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
       };
     }
 
-    const transferMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s*(抵)(?:\s|$)/i);
+    const transferMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s*(抵)(?:\s*[YN-])?(?:\s|$)/i);
     if (transferMatch) {
       return {
         credits: Number(transferMatch[1]),
@@ -374,7 +374,7 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
   const courses: TranscriptCourse[] = [];
   const typePattern = "(必|選|通|體|服|Req|Elec|Gen|P\\.?E\\.?|Service)";
   const startPattern = new RegExp(`^([A-Z]?\\d{4,6}|抵)\\s+${typePattern}$`, "i");
-  const scorePattern = /^(?:(.+?)\s+)?([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|P|抵|-)(?:\s+([A-F][+-]?|P|W|抵|-))?\s+([YN-]))?$/i;
+  const scorePattern = /^(?:(.+?)\s+)?([0-6](?:\.[05])?)(?:\s*(\d{1,3}|I|W|P|抵|-)(?:\s*([A-F][+-]?|P|W|抵|-))?\s*([YN-])?)?$/i;
   const normalizeCourseType = (value: string) => {
     const matchedType = value.match(/必|選|通|體|服/)?.[0];
     return matchedType ?? "";
@@ -406,13 +406,13 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
     const offeredBy = offeredByLine.match(/(?:^|\s)([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? "";
 
     const credits = Number(detailMatch[2]);
-    const grade = detailMatch[4]
-      ? normalizeGrade(detailMatch[4])
-      : detailMatch[3] === "抵"
+    const grade = detailMatch[3] === "抵"
         ? "抵"
-        : detailMatch[3]
-          ? "-"
-          : "";
+        : detailMatch[4]
+          ? normalizeGrade(detailMatch[4])
+          : detailMatch[3]
+            ? "-"
+            : "";
     if (!Number.isFinite(credits) || (credits > 0 && !grade)) continue;
 
     courses.push(withCourseDefaults({
@@ -445,7 +445,7 @@ const parseNchuMobileCompactTranscript = (text: string, profile: RequirementProf
     .filter(Boolean);
   const courses: TranscriptCourse[] = [];
   const startPattern = /^([A-Z]?\d{4,6}|抵)\s+(.+)$/;
-  const scorePattern = /^(Req(?:uired)?|Elec(?:tive)?|Gen|P\.?E\.?|Service)?\s*([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s+([YN-])(?:\s+.*)?$/i;
+  const scorePattern = /^(Req(?:uired)?|Elec(?:tive)?|Gen|P\.?E\.?|Service)?\s*([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s*([A-F][+-]?|\d{1,3}|I|W|-)\s*([A-F][+-]?|P|W|抵|-)\s*([YN-])(?:\s+.*)?$/i;
   const typePattern = /(必修|選修|通識|體育|服務|Required|Elective|Gen|P\.?E\.?|Service)/i;
   const typeMap: Record<string, string> = {
     必修: "必",

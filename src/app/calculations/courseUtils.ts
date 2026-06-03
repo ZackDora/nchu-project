@@ -111,6 +111,8 @@ export const inferCategory = (name: string, profile: RequirementProfile = fallba
 
 export const categorySummaryKey = (category: string, profile: RequirementProfile = fallbackRequirementProfile) => {
   if (category === "體育") return profile.nonGraduationRequirement?.category ?? "體育/服務學習";
+  if (/大學國文|敘事表達/.test(category)) return "語言素養課程";
+  if (category === "全校英外語" || category === "外國語文") return "語言素養課程";
   if (["人文領域", "社會科學領域", "自然科學領域", "統合領域", "核心素養", "資訊素養", "語言素養課程", "國防教育"].includes(category)) {
     return category;
   }

@@ -10,6 +10,7 @@ const server = await createServer({
 try {
   const { parsePastedCourses } = await server.ssrLoadModule("/src/app/parsing/transcriptParser.ts");
   const { getRequirementProfile } = await server.ssrLoadModule("/src/app/data/requirements.ts");
+  const { getPrimaryCreditAudit } = await server.ssrLoadModule("/src/app/calculations/primaryAudit.ts");
   const profile = getRequirementProfile("外國語文學系");
 
   const mobilePaste = `
@@ -460,8 +461,156 @@ Freshman English - - 2 抵 -
   assert.equal(narrowWrappedCourses[10].category, "語言素養課程");
   assert.equal(narrowWrappedCourses[11].name, "大一英文");
   assert.equal(narrowWrappedCourses[11].grade, "抵");
+  const narrowWrappedAudit = getPrimaryCreditAudit(
+    narrowWrappedCourses.map((course) => ({ ...course, semester: "111-1" })),
+    profile,
+    "local",
+    111,
+  );
+  assert.equal(narrowWrappedAudit.externalCourseAudits.some((audit) => audit.course.name === "大學國文"), false);
 
-  console.log("transcript parser tests passed: 70");
+  const compactNoSpaceTranscript = `
+0313通
+Gen
+語⾔、文化與溝通
+Language, Culture
+and Communication
+⼈文領域
+Humanistic
+Category
+通識中⼼
+General Education
+Center
+2 90 A+ Y
+0456通
+Gen
+數位媒體與第⼆外
+語習得
+Digital Media and
+Second Language
+Acquisition
+社會科學領
+域
+Social
+Science
+Category
+通識中⼼
+General Education
+Center
+2 95 A+ Y
+0959選
+Elec
+實⽤華語(⼆)
+Practical Chinese(II)
+全校可選修
+Other
+Elective
+Course
+語⾔中⼼
+Language Center
+3 96 A+ N
+1062必
+Req
+英語⼝語訓練(⼀)
+English Oral Training
+(I)
+外文系
+Department of
+Foreign
+Languages and
+Literatures
+2 92 A+ N
+1752必
+Req
+⼤學國文
+College Chinese
+敘事表達/
+⼤學國文
+College
+Chinese
+通識中⼼
+General Education
+Center
+2 88 A N
+1903必
+Req
+數位⼈文概論
+Introduction to
+Digital Humanities
+文學院
+College of Liberal
+Arts
+2 83 A-N
+1904必
+Req
+歷史與電影
+History and Films
+文學院
+College of Liberal
+Arts
+1 89 A Y
+1905必
+Req
+台灣語⾔與文化
+Taiwanese Languages
+and Cultures
+文學院
+College of Liberal
+Arts
+1 90 A+ Y
+2224選
+Elec
+商業談判
+Commercial
+Negotiation
+⾏銷系
+Department of
+Marketing
+3 86 A Y
+6112選
+Elec
+中國商法導論專題
+Introduction to
+Chinese Business Law
+法律系
+Department of
+Law
+2 80 A-Y
+9996必
+Req
+英文能⼒檢定及輔
+導
+English Proficiency
+Requirement
+全校英外語
+English
+Language
+Courses
+語⾔中⼼
+Language Center
+0 I-N
+抵通
+Gen
+⼤⼀英文
+Freshman English-- 2抵
+`;
+
+  const compactNoSpaceCourses = parsePastedCourses(compactNoSpaceTranscript, profile);
+  assert.equal(compactNoSpaceCourses.length, 12);
+  assert.equal(compactNoSpaceCourses.some((course) => course.name === "Gen"), false);
+  assert.equal(compactNoSpaceCourses[5].name, "數位人文概論");
+  assert.equal(compactNoSpaceCourses[5].score, "83");
+  assert.equal(compactNoSpaceCourses[5].grade, "A-");
+  assert.equal(compactNoSpaceCourses[9].name, "中國商法導論專題");
+  assert.equal(compactNoSpaceCourses[9].score, "80");
+  assert.equal(compactNoSpaceCourses[9].grade, "A-");
+  assert.equal(compactNoSpaceCourses[10].name, "英文能力檢定及輔導");
+  assert.equal(compactNoSpaceCourses[10].score, "I");
+  assert.equal(compactNoSpaceCourses[10].credits, 0);
+  assert.equal(compactNoSpaceCourses[11].name, "大一英文");
+  assert.equal(compactNoSpaceCourses[11].grade, "抵");
+
+  console.log("transcript parser tests passed: 84");
 } finally {
   await server.close();
 }
