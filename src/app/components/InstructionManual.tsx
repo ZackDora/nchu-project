@@ -23,17 +23,19 @@ const manualSteps = [
         src: `${import.meta.env.BASE_URL}manual-step-2-1.png`,
         alt: "教務資訊系統首頁",
       },
-      {
-        src: `${import.meta.env.BASE_URL}manual-step-2-2.png`,
-        alt: "教務資訊系統左側選單中的歷年成績位置",
-        narrow: true,
-      },
     ],
   },
   {
     icon: FileText,
     title: "打開歷年成績",
     description: "在左側選單選擇「學生成績」，再點選「歷年成績」。",
+    images: [
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-2-2.png`,
+        alt: "教務資訊系統左側選單中的歷年成績位置",
+        narrow: true,
+      },
+    ],
   },
   {
     icon: MousePointerClick,
