@@ -6,6 +6,12 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0",
+    "test": "npm run test:topic && npm run test:programs",
+    "test:programs": "node scripts/test-program-rules.mjs",
+    "test:topic": "node scripts/test-learning-topic.mjs",
+    "start": "node server.mjs",
+    "serve": "npm run build && npm run start",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
@@ -14,14 +20,11 @@
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
     "lucide-react": "0.487.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-router": "7.13.0",
-    "react-router-dom": "^7.15.0",
     "tailwindcss": "^4.2.3",
     "vite": "^8.0.9"
-  },
-  "peerDependencies": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

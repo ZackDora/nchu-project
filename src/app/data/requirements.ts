@@ -4,6 +4,11 @@ export interface DepartmentRequirement {
   college: string;
   name: string;
   credits: number;
+  admissionYear?: number;
+  supportedAdmissionYears?: number[];
+  sourceUrl?: string;
+  notes?: string[];
+  manualChecks?: string[];
 }
 
 export interface RequirementPlan {
@@ -56,12 +61,55 @@ export interface RequirementProfile {
   languageLiteracyRequirements: NamedCreditRequirement[];
   choiceCreditRequirements: ChoiceCreditRequirement[];
   externalCreditLimit?: number;
+  generalEducationCreditLimit?: number;
   homeDepartmentPatterns: RegExp[];
   generalRequirementCategories: string[];
 }
 
 export const departmentCredits: Record<string, DepartmentRequirement[]> = {
-  文學院: [{ college: "文學院", name: "外國語文學系", credits: 128 }],
+  文學院: [{ college: "文學院", name: "外國語文學系", credits: 128, supportedAdmissionYears: [111, 112, 113, 114, 115, 116] }],
+  農業暨自然資源學院: [
+    {
+      college: "農業暨自然資源學院",
+      name: "植物病理學系",
+      credits: 136,
+      admissionYear: 114,
+      supportedAdmissionYears: [114],
+      notes: [
+        "114學年度起入學植物病理學系學士班最低畢業總學分136學分，不含體育課程。",
+        "通識課程28學分；系專業必修52學分；系專業選修36學分。",
+        "資訊素養：程式設計與AI應用必修1學分，外籍生得免修。",
+        "生命科學學群通識課程至多採計1門；超修通識課程不採計為外系學分。",
+        "承認外系學分上限以20學分為原則。",
+      ],
+      manualChecks: [
+        "體育課程必修2學分，不計入畢業學分；超修體育課程至多採計為外系2學分，需人工確認。",
+        "英文能力檢定0學分，學系如另訂更高標準需人工確認。",
+        "入學資格屬修業年限少於國內高級中等學校及專科學校之國外同等學校畢業生，畢業學分數應增加至少12學分，需人工確認。",
+      ],
+    },
+  ],
+  工學院: [
+    {
+      college: "工學院",
+      name: "機械工程學系",
+      credits: 136,
+      admissionYear: 114,
+      supportedAdmissionYears: [114],
+      sourceUrl: "https://www.me.nchu.edu.tw/student.php?tag_id=sBachelor",
+      notes: [
+        "114學年度起入學機械工程學系學士班最低畢業總學分136學分，不含體育課程。",
+        "通識課程28學分；系專業必修74學分；系專業選修25學分。",
+        "體育課程必修2學分，不計入畢業學分；超修體育課程至多採計為外系2學分，需由人工確認。",
+        "資訊素養：程式設計與AI應用免修；若修習，不採計為通識畢業學分。",
+        "通識課程中，工程科技學群至多採計1門；工具原理與應用、環境與能源、實用生活化學、物理世界的奧秘不列入通識學分。",
+      ],
+      manualChecks: [
+        "選修本系碩士班課程經申請亦可列入專業選修學群，需人工確認申請結果。",
+        "入學資格屬修業年限少於國內高級中等學校及專科學校之國外同等學校畢業生，畢業學分數應增加至少12學分，需人工確認。",
+      ],
+    },
+  ],
 };
 
 export const allDepartments = Object.values(departmentCredits).flat();
@@ -131,6 +179,42 @@ export const requirementProfiles: Record<string, RequirementProfile> = {
       /DepartmentofForeignLanguages/i,
     ],
   },
+  機械工程學系: {
+    ...defaultRequirementProfile,
+    departmentName: "機械工程學系",
+    generalEducationCreditLimit: 28,
+    languageLiteracyRequirements: [
+      { name: "大學國文", requiredCredits: 4 },
+      { name: "大一英文", requiredCredits: 4 },
+      { name: "學術英語聽講", requiredCredits: 2 },
+    ],
+    homeDepartmentPatterns: [
+      /機械工程學系/i,
+      /機械系/i,
+      /機械工程/i,
+      /MechanicalEngineering/i,
+      /DepartmentofMechanicalEngineering/i,
+    ],
+  },
+  植物病理學系: {
+    ...defaultRequirementProfile,
+    departmentName: "植物病理學系",
+    generalEducationCreditLimit: 28,
+    externalCreditLimit: 20,
+    languageLiteracyRequirements: [
+      { name: "敘事表達：語文素養", requiredCredits: 2 },
+      { name: "敘事表達：語文應用", requiredCredits: 2 },
+      { name: "英語溝通與表達", requiredCredits: 2 },
+      { name: "學術英文聽讀", requiredCredits: 2 },
+    ],
+    homeDepartmentPatterns: [
+      /植物病理學系/i,
+      /植物病理/i,
+      /植病系/i,
+      /PlantPathology/i,
+      /DepartmentofPlantPathology/i,
+    ],
+  },
 };
 
 export const getRequirementProfile = (departmentName: string) =>
@@ -169,6 +253,34 @@ export const digitalHumanitiesProgramRecognizedCourses: ProgramCourseRule[] = [
   { name: "設計思考", credits: 2, offeredBy: "通識中心" },
 ];
 
+export const animalScienceIndustryProgramId = "program-animal-science-industry";
+
+export const animalScienceIndustryProgramCourses: ProgramCourseRule[] = [
+  { name: "伴侶動物營養觀念建立及應用", credits: 1, offeredBy: "動物科學系" },
+  { name: "實驗動物技術與應用", credits: 2, offeredBy: "動物科學系" },
+  { name: "課外實習", credits: 1, offeredBy: "動物科學系" },
+  { name: "酪農業與豬隻產業之現況", credits: 1, offeredBy: "動物科學系" },
+  { name: "豬隻飼養管理與品牌行銷", credits: 2, offeredBy: "動物科學系" },
+  { name: "動物產業管理與行銷", credits: 2, offeredBy: "動物科學系" },
+  { name: "企業實習（一）", credits: 3, offeredBy: "動物科學系" },
+  { name: "企業實習（二）", credits: 3, offeredBy: "動物科學系" },
+  { name: "馬術產業管理", credits: 2, offeredBy: "動物科學系" },
+  { name: "環境與動物生產", credits: 2, offeredBy: "動物科學系" },
+];
+
+export const programCourseRulesByPlanId: Record<string, ProgramCourseRule[]> = {
+  [digitalHumanitiesProgramId]: [...digitalHumanitiesProgramCourses, ...digitalHumanitiesProgramRecognizedCourses],
+  [animalScienceIndustryProgramId]: animalScienceIndustryProgramCourses,
+};
+
+export const getProgramCourseRules = (planId: string) => programCourseRulesByPlanId[planId] ?? [];
+
+export const isConfiguredProgramPlanCourse = (
+  planId: string,
+  course: Pick<{ name: string }, "name">,
+  matchesAnyName: (courseName: string, names: string[]) => boolean,
+) => getProgramCourseRules(planId).some((rule) => matchesAnyName(course.name, [rule.name]));
+
 export const optionalProgramPlans: RequirementPlan[] = [
   {
     id: digitalHumanitiesProgramId,
@@ -186,6 +298,20 @@ export const optionalProgramPlans: RequirementPlan[] = [
       "114-2起不再認列：資訊科技與社會、Python程式設計、物件導向程式設計、大數據分析程式實作。",
       "學程未修畢不影響畢業年限，亦無須辦理退出。",
       "分數欄為「抵」的課程不可抵免學程學分。",
+    ],
+  },
+  {
+    id: animalScienceIndustryProgramId,
+    type: "program",
+    name: "動物科學產業微學分學程",
+    requiredCredits: 6,
+    source: "catalog",
+    admissionYear: 114,
+    notes: [
+      "依114年4月28日公告之動物科學產業微學分學程課程規劃表建立。",
+      "本學程至少須修習所列必修與選修課程共6學分，方授予「動物科學產業微學分學程」證書。",
+      "合作開設單位包含動物科學系、樂斯科生物科技股份有限公司、青欣牧場、中美嘉吉公司等產業與公民營單位。",
+      "本工具目前採計課程名稱符合規劃表所列科目，抵免課程不採計。",
     ],
   },
 ];

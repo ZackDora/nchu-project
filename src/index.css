@@ -12,3 +12,54 @@ body,
   margin: 0;
   min-height: 100%;
 }
+
+.chat-markdown {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.chat-markdown p {
+  margin: 0;
+}
+
+.chat-markdown .chat-heading {
+  font-weight: 700;
+  color: rgb(30 64 175);
+}
+
+.dark .chat-markdown .chat-heading {
+  color: rgb(147 197 253);
+}
+
+.chat-markdown strong {
+  font-weight: 700;
+}
+
+.chat-markdown code {
+  border-radius: 0.25rem;
+  background: rgb(229 231 235);
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+}
+
+.dark .chat-markdown code {
+  background: rgb(55 65 81);
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.chat-markdown ul {
+  list-style: disc;
+}
+
+.chat-markdown ol {
+  list-style: decimal;
+}
+
+.chat-markdown li + li {
+  margin-top: 0.25rem;
+}

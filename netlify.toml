@@ -1,0 +1,19 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/nchu/*"
+  to = "/.netlify/functions/nchu/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/nchu-project/*"
+  to = "/nchu-project/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/nchu-project/index.html"
+  status = 200

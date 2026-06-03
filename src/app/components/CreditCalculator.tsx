@@ -1,684 +1,49 @@
-import { Calculator, ClipboardPaste, Download, GraduationCap, Plus, Trash2 } from "lucide-react";
+import { Calculator, ClipboardPaste, GraduationCap, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { dfllGeneralEdOverflowExternalLimit, getDfllRequirementAudits, getDfllRequirementRows, isDfllProfile, isDfllRequiredCourseForProgramRule } from "../calculations/dfll";
+import { getMechanicalAdditionalCollegeRequirement, getMechanicalCoreRequirement, getMechanicalGeneralEducationRequirement, getMechanicalProfessionalElectiveRequirement, getMechanicalRequiredProfessionalRequirement } from "../calculations/mechanical";
+import { getPlantPathologyGeneralEducationRequirement, getPlantPathologyOtherGraduationRequirement, getPlantPathologyProfessionalElectiveRequirement, getPlantPathologyRequiredProfessionalRequirement } from "../calculations/plantPathology";
+import { getPrimaryCreditAudit } from "../calculations/primaryAudit";
+import {
+  categoryOptions,
+  compactCourseText,
+  countableCredits,
+  emptyCourse,
+  fallbackRequirementProfile,
+  firstSupportedAdmissionYear,
+  getChoiceRequirementOption,
+  getCourseCategory,
+  getCourseChronology,
+  getCourseDisplayName,
+  getDuplicateKey,
+  getScoreDisplay,
+  getSemesterOptions,
+  getSemesterTerm,
+  inferCategory,
+  isFailedCourse,
+  isGeneralEducationCourse,
+  isHomeDepartmentCourse,
+  isWithdrawnCourse,
+  matchesAnyName,
+  normalizeGrade,
+  sortCoursesChronologically,
+  typeLabels,
+} from "../calculations/courseUtils";
 import { useTranscript, type TranscriptCourse } from "../context/TranscriptContext";
 import {
   allDepartments,
   defaultPlanId,
   departmentCredits,
-  digitalHumanitiesProgramCourses,
   digitalHumanitiesProgramId,
-  digitalHumanitiesProgramRecognizedCourses,
+  getProgramCourseRules,
   getRequirementProfile,
+  isConfiguredProgramPlanCourse,
   optionalProgramPlans,
   planTypeLabels,
-  type ChoiceCreditRequirement,
   type RequirementPlan,
-  type RequirementProfile,
-  type RequirementPlanType,
 } from "../data/requirements";
-
-const categoryOptions = [
-  "人文領域",
-  "社會科學領域",
-  "自然科學領域",
-  "統合領域",
-  "核心素養",
-  "資訊素養",
-  "語言素養課程",
-  "國防教育",
-  "共同必修/通識",
-  "體育/服務學習",
-  "專業課程",
-  "其他",
-];
-
-const fallbackRequirementProfile = getRequirementProfile("外國語文學系");
-const dfllDepartmentName = "外國語文學系";
-const dfllGeneralEdOverflowExternalLimit = 10;
-
-const dfllDigitalHumanitiesCourses = [
-  "數位人文概論",
-  "影像處理與電腦繪畫",
-  "網頁設計",
-  "數位敘事應用",
-  "數位內容策展",
-  "數位人文GIS應用",
-  "程式設計與人文應用",
-];
-
-const dfllCollegeEmiCourses = ["歷史與電影", "文化臺中", "飲食與文化", "台灣語言與文化", "歐洲現代史導讀"];
-
-const dfllRequiredProfessionalCourses = [
-  { name: "英語口語訓練(一)", requiredCredits: 4, aliases: ["英語口語訓練（一）", "英語口語訓練(一)"] },
-  { name: "英語口語訓練(二)", requiredCredits: 4, aliases: ["英語口語訓練（二）", "英語口語訓練(二)"] },
-  { name: "英文作文(一)", requiredCredits: 4, aliases: ["英文作文（一）", "英文作文(一)"] },
-  { name: "英文作文(二)", requiredCredits: 4, aliases: ["英文作文（二）", "英文作文(二)"] },
-  { name: "文學作品讀法", requiredCredits: 4, aliases: ["文學作品讀法"] },
-  { name: "西洋文學概論", requiredCredits: 4, aliases: ["西洋文學概論"] },
-  { name: "語言學概論", requiredCredits: 4, aliases: ["語言學概論"] },
-];
-
-const dfllBritishAmericanLiteratureCourses = [
-  "英國文學:中古與文藝復興時期",
-  "英國文學:復辟與新古典時期",
-  "英國文學:浪漫與維多利亞時期",
-  "英國文學:二十世紀迄今",
-  "美國文學:二十世紀前",
-  "美國文學:二十世紀迄今",
-];
-
-const fullYearCourseAliases = [
-  ...dfllRequiredProfessionalCourses.flatMap((course) => course.aliases),
-  "大學國文",
-  "大一英文",
-];
-const firstSupportedAdmissionYear = 111;
-const supportedAdmissionYears = [111, 112, 113, 114, 115, 116];
-
-const getSemesterOptions = (admissionYear: number) =>
-  Array.from({ length: 4 }, (_, yearOffset) => admissionYear + yearOffset).flatMap((year) => [`${year}-1`, `${year}-2`]);
-
-const getSemesterTerm = (semester: string) => semester.match(/-(1|2)$/)?.[1] ?? "";
-
-const getCourseChronology = (course: Pick<TranscriptCourse, "semester">) => {
-  const match = course.semester.match(/^(\d{3})-(1|2)$/);
-  if (!match) return Number.MAX_SAFE_INTEGER;
-  return Number(match[1]) * 10 + Number(match[2]);
-};
-
-const sortCoursesChronologically = <T extends Pick<TranscriptCourse, "semester">>(items: T[]) =>
-  [...items].sort((a, b) => getCourseChronology(a) - getCourseChronology(b));
-
-const isFullYearCourseName = (name: string) => matchesAnyName(name, fullYearCourseAliases);
-
-const isWithdrawnCourse = (course: Pick<TranscriptCourse, "score" | "grade">) =>
-  course.score.toUpperCase() === "W" || course.grade.toUpperCase() === "W";
-
-const isFailedCourse = (course: Pick<TranscriptCourse, "grade">) => course.grade.toUpperCase() === "F";
-
-const isUncountedOutcomeCourse = (course: Pick<TranscriptCourse, "score" | "grade">) =>
-  isWithdrawnCourse(course) || isFailedCourse(course);
-
-const getScoreDisplay = (course: Pick<TranscriptCourse, "score" | "grade">) => {
-  if (isWithdrawnCourse(course)) return "退選，不採計學分";
-  if (isFailedCourse(course)) return "不及格，不採計學分";
-  return course.score;
-};
-
-const getFullYearCompletedCredits = (courses: TranscriptCourse[], aliases: string[], requiredCredits: number, profile: RequirementProfile) => {
-  const perTermCap = requiredCredits / 2;
-  const termCredits = { "1": 0, "2": 0 } as Record<string, number>;
-  for (const course of courses) {
-    if (!matchesAnyName(course.name, aliases)) continue;
-    const term = getSemesterTerm(course.semester);
-    if (term === "1" || term === "2") {
-      termCredits[term] += countableCredits(course, profile);
-    }
-  }
-  return Math.min(termCredits["1"], perTermCap) + Math.min(termCredits["2"], perTermCap);
-};
-
-const emptyCourse = (): TranscriptCourse => ({
-  courseNo: "",
-  semester: "",
-  name: "",
-  credits: 0,
-  score: "",
-  grade: "",
-  type: "",
-  typeLabel: "",
-  category: "其他",
-  offeredBy: "",
-  emi: false,
-  genEdProfessorFromMajorDepartment: false,
-  planId: defaultPlanId,
-});
-
-const normalizeGrade = (value: string) => value.trim().toUpperCase().replace("＋", "+").replace("－", "-");
-
-const inferCategory = (name: string, profile: RequirementProfile = fallbackRequirementProfile, offeredBy = "") => {
-  if (profile.languageLiteracyRequirements.some((requirement) => compactCourseText(name).includes(compactCourseText(requirement.name)))) return "語言素養課程";
-  if (/(國防|全民國防|軍訓)/.test(name)) return "國防教育";
-  if (/(體育|服務)/.test(name)) return "體育/服務學習";
-  if (isDfllProfile(profile) && dfllRequiredProfessionalCourses.some((course) => matchesAnyName(name, course.aliases))) return "專業課程";
-  if (isDfllProfile(profile) && matchesAnyName(name, dfllBritishAmericanLiteratureCourses)) return "專業課程";
-  if (isDfllProfile(profile) && matchesAnyName(name, dfllDigitalHumanitiesCourses)) return "專業課程";
-  if (isDfllProfile(profile) && matchesAnyName(name, dfllCollegeEmiCourses)) return "專業課程";
-  if (isDfllProfile(profile) && offeredBy && /(數位人文|Digital\s*Humanities)/i.test(name) && /(文學院|CollegeofLiberalArts)/i.test(compactCourseText(offeredBy))) return "專業課程";
-  if (offeredBy && profile.homeDepartmentPatterns.some((pattern) => pattern.test(compactCourseText(offeredBy)))) return "專業課程";
-  if (profile.choiceCreditRequirements.some((requirement) => requirement.options.some((option) => option.pattern.test(name)))) return "專業課程";
-  if (/(通識|共同|語文)/.test(name)) return "共同必修/通識";
-  return "其他";
-};
-
-const categorySummaryKey = (category: string, profile: RequirementProfile = fallbackRequirementProfile) => {
-  if (category === "體育") return profile.nonGraduationRequirement?.category ?? "體育/服務學習";
-  if (["人文領域", "社會科學領域", "自然科學領域", "統合領域", "核心素養", "資訊素養", "語言素養課程", "國防教育"].includes(category)) {
-    return category;
-  }
-  if (categoryOptions.includes(category)) return category;
-  return "其他";
-};
-
-const typeLabels: Record<string, string> = {
-  必: "必修",
-  選: "選修",
-  通: "通識",
-  體: "體育",
-  服: "服務學習",
-};
-
-const getCourseCategory = (course: Pick<TranscriptCourse, "category" | "name" | "offeredBy" | "type">, profile: RequirementProfile = fallbackRequirementProfile) => {
-  if (course.type === "體" || course.type === "服") return profile.nonGraduationRequirement?.category ?? "體育/服務學習";
-  return categorySummaryKey(course.category || inferCategory(course.name, profile, course.offeredBy), profile);
-};
-
-const countableCredits = (course: Pick<TranscriptCourse, "category" | "credits" | "grade" | "name" | "score" | "type">, profile: RequirementProfile = fallbackRequirementProfile) =>
-  isUncountedOutcomeCourse(course) || profile.nonGraduationCreditCategories.includes(getCourseCategory(course, profile)) ? 0 : course.credits;
-
-const getDuplicateKey = (course: Pick<TranscriptCourse, "courseNo" | "name" | "semester">) => {
-  const name = compactCourseText(course.name);
-  if (isFullYearCourseName(course.name)) {
-    const term = getSemesterTerm(course.semester);
-    return name && term ? `full-year:${name}:${term}` : "";
-  }
-  const courseNo = compactCourseText(course.courseNo);
-  if (courseNo && name) return `no-name:${courseNo}:${name}`;
-  if (courseNo) return `no:${courseNo}`;
-  return name ? `name:${name}` : "";
-};
-
-const compactCourseText = (value: string) =>
-  value.normalize("NFKC").replace(/⻄/g, "西").replace(/\s+/g, "").trim().toLowerCase();
-
-const matchesAnyName = (courseName: string, names: string[]) => {
-  const compactName = compactCourseText(courseName);
-  return names.some((name) => compactName.includes(compactCourseText(name)));
-};
-
-const getCourseDisplayName = (course: Pick<TranscriptCourse, "courseNo" | "name">) =>
-  course.name || course.courseNo || "未命名課程";
-
-const getChoiceRequirementOption = (course: Pick<TranscriptCourse, "name">, requirement: ChoiceCreditRequirement) =>
-  requirement.options.find((option) => option.pattern.test(course.name));
-
-const isHomeDepartmentCourse = (course: Pick<TranscriptCourse, "offeredBy">, profile: RequirementProfile) =>
-  profile.homeDepartmentPatterns.some((pattern) => pattern.test(compactCourseText(course.offeredBy)));
-
-const isGeneralRequirementCategory = (category: string, profile: RequirementProfile) =>
-  profile.generalRequirementCategories.includes(category);
-
-const isDfllProfile = (profile: RequirementProfile) => profile.departmentName === dfllDepartmentName;
-
-const isGeneralEducationCourse = (course: TranscriptCourse, profile: RequirementProfile) => {
-  const category = getCourseCategory(course, profile);
-  return isGeneralRequirementCategory(category, profile) || category === "統合領域" || category === "國防教育";
-};
-
-const isLiteratureCollegeGeneralCourse = (course: TranscriptCourse, profile: RequirementProfile) =>
-  isGeneralEducationCourse(course, profile) && /(文學院|外文系|外國語文學系|中國文學|中文系|歷史學系|歷史系)/.test(course.offeredBy);
-
-const isCommonEnglishCourse = (course: TranscriptCourse) =>
-  /(英文|英語|English)/i.test(course.name) &&
-  !/大一英文/.test(course.name) &&
-  /(語言中心|LanguageCenter)/i.test(compactCourseText(course.offeredBy));
-
-const isDfllDepartmentRequirementCourse = (course: Pick<TranscriptCourse, "name">) =>
-  dfllRequiredProfessionalCourses.some((requirement) => matchesAnyName(course.name, requirement.aliases)) ||
-  matchesAnyName(course.name, dfllBritishAmericanLiteratureCourses) ||
-  matchesAnyName(course.name, dfllDigitalHumanitiesCourses) ||
-  matchesAnyName(course.name, dfllCollegeEmiCourses);
-
-const isDfllRequiredNamedProfessionalCourse = (course: Pick<TranscriptCourse, "name">) =>
-  dfllRequiredProfessionalCourses.some((requirement) => matchesAnyName(course.name, requirement.aliases));
-
-const isDfllBritishAmericanLiteratureCourse = (course: Pick<TranscriptCourse, "name">) =>
-  matchesAnyName(course.name, dfllBritishAmericanLiteratureCourses);
-
-const isDfllRequiredCourseForProgramRule = (
-  course: TranscriptCourse,
-  admissionYear: number,
-  studentStatus: "local" | "foreign" = "local",
-) => {
-  const category = getCourseCategory(course, fallbackRequirementProfile);
-  const isInformationLiteracyCourse =
-    category === "資訊素養" || compactCourseText(course.name).includes(compactCourseText("資訊素養"));
-  return (
-    course.type === "必" ||
-    fallbackRequirementProfile.languageLiteracyRequirements.some((requirement) => matchesAnyName(course.name, [requirement.name])) ||
-    (category === "核心素養" && !(studentStatus === "foreign" && isInformationLiteracyCourse)) ||
-    (category === "資訊素養" && studentStatus !== "foreign") ||
-    category === "共同必修/通識" ||
-    isDfllRequiredNamedProfessionalCourse(course) ||
-    isDfllBritishAmericanLiteratureCourse(course) ||
-    isDfllDigitalHumanitiesCourseForAdmissionYear(course, admissionYear) ||
-    isDfllCollegeEmiCourseForAdmissionYear(course, admissionYear)
-  );
-};
-
-const isDigitalHumanitiesProgramCourse = (course: TranscriptCourse) =>
-  [...digitalHumanitiesProgramCourses, ...digitalHumanitiesProgramRecognizedCourses].some((rule) =>
-    matchesAnyName(course.name, [rule.name]),
-  );
-
-const isCollegeOfLiberalArtsCourse = (course: Pick<TranscriptCourse, "offeredBy">) =>
-  /(文學院|CollegeofLiberalArts)/i.test(compactCourseText(course.offeredBy));
-
-const isCollegeDigitalInformationDesignAiCourse = (course: Pick<TranscriptCourse, "name">) =>
-  /(數位|資訊|設計|AI)/i.test(course.name);
-
-const isDfllDigitalHumanitiesCourseForAdmissionYear = (
-  course: Pick<TranscriptCourse, "name" | "offeredBy">,
-  admissionYear: number,
-) =>
-  matchesAnyName(course.name, dfllDigitalHumanitiesCourses) ||
-  (admissionYear >= 112 && isCollegeOfLiberalArtsCourse(course) && isCollegeDigitalInformationDesignAiCourse(course));
-
-const isDfllCollegeEmiCourseForAdmissionYear = (
-  course: Pick<TranscriptCourse, "name" | "offeredBy" | "emi">,
-  admissionYear: number,
-) =>
-  course.emi &&
-  (matchesAnyName(course.name, dfllCollegeEmiCourses) ||
-    (admissionYear >= 112 && isCollegeOfLiberalArtsCourse(course)));
-
-const getPrimaryCreditAudit = (courses: TranscriptCourse[], profile: RequirementProfile, studentStatus: "local" | "foreign", admissionYear: number) => {
-  const countableCourses = sortCoursesChronologically(
-    courses.filter((course) => course.planId === defaultPlanId && countableCredits(course, profile) > 0),
-  );
-  const choiceRequirementAudits = profile.choiceCreditRequirements.map((requirement) => {
-    const optionCredits = Object.fromEntries(requirement.options.map((option) => [option.id, 0])) as Record<string, number>;
-
-    for (const course of countableCourses) {
-      const option = getChoiceRequirementOption(course, requirement);
-      if (option) optionCredits[option.id] += countableCredits(course, profile);
-    }
-
-    const selectedOption = requirement.options
-      .map((option) => ({ ...option, credits: optionCredits[option.id] }))
-      .sort((a, b) => b.credits - a.credits)[0];
-
-    return {
-      requirement,
-      optionCredits,
-      selectedOptionId: selectedOption?.credits > 0 ? selectedOption.id : "",
-      protectedCredits: Math.min(selectedOption?.credits ?? 0, requirement.requiredCredits),
-    };
-  });
-
-  const remainingProtectedCredits = Object.fromEntries(
-    choiceRequirementAudits.map((audit) => [audit.requirement.title, audit.protectedCredits]),
-  ) as Record<string, number>;
-  let baseCredits = 0;
-  let externalCredits = 0;
-  let generalEducationCredits = 0;
-  let excludedCredits = 0;
-  let nationalDefenseCoursesAccepted = 0;
-  let literatureCollegeGeneralCoursesAccepted = 0;
-  const externalCourseCandidates: { course: TranscriptCourse; credits: number }[] = [];
-  const generalEducationCandidates: { course: TranscriptCourse; credits: number }[] = [];
-  const uncountedCourseAudits: { course: TranscriptCourse; acceptedCredits: number; uncountedCredits: number; note: string }[] = [];
-
-  const addUncountedCourseAudit = (course: TranscriptCourse, acceptedCredits: number, uncountedCredits: number, note: string) => {
-    if (uncountedCredits <= 0) return;
-    uncountedCourseAudits.push({ course, acceptedCredits, uncountedCredits, note });
-  };
-
-  for (const course of countableCourses) {
-    const credits = countableCredits(course, profile);
-    const category = getCourseCategory(course, profile);
-    const isGeneralEducation = isGeneralEducationCourse(course, profile);
-
-    if (isDfllProfile(profile) && isCommonEnglishCourse(course)) {
-      excludedCredits += credits;
-      addUncountedCourseAudit(course, 0, credits, "外文系學生選修全校共同英文課程，不計入畢業學分。");
-      continue;
-    }
-
-    if (isGeneralEducation) {
-      if (course.genEdProfessorFromMajorDepartment) {
-        excludedCredits += credits;
-        addUncountedCourseAudit(course, 0, credits, "本系教師於通識中心所開課程，不列入畢業學分。");
-        continue;
-      }
-      if (category === "國防教育") {
-        if (nationalDefenseCoursesAccepted >= 1) {
-          excludedCredits += credits;
-          addUncountedCourseAudit(course, 0, credits, "國防教育類課程至多採計1門為通識畢業學分。");
-          continue;
-        }
-        nationalDefenseCoursesAccepted += 1;
-      }
-      if (isDfllProfile(profile) && isLiteratureCollegeGeneralCourse(course, profile)) {
-        if (literatureCollegeGeneralCoursesAccepted >= 1) {
-          excludedCredits += credits;
-          addUncountedCourseAudit(course, 0, credits, "文學學群通識課程至多採計1門，超修不採計為外系學分。");
-          continue;
-        }
-        literatureCollegeGeneralCoursesAccepted += 1;
-      }
-      generalEducationCandidates.push({ course, credits });
-      continue;
-    }
-
-    let protectedRequirementCredits = 0;
-    let matchedChoiceRequirement = false;
-
-    for (const audit of choiceRequirementAudits) {
-      const option = getChoiceRequirementOption(course, audit.requirement);
-      if (!option) continue;
-      matchedChoiceRequirement = true;
-      const remaining = remainingProtectedCredits[audit.requirement.title] ?? 0;
-      const protectedForThisRequirement =
-        option.id === audit.selectedOptionId && remaining > 0
-          ? Math.min(credits - protectedRequirementCredits, remaining)
-          : 0;
-
-      if (protectedForThisRequirement > 0) {
-        protectedRequirementCredits += protectedForThisRequirement;
-        remainingProtectedCredits[audit.requirement.title] = remaining - protectedForThisRequirement;
-      }
-    }
-
-    if (protectedRequirementCredits > 0) {
-      baseCredits += protectedRequirementCredits;
-    }
-
-    const remainingCredits = credits - protectedRequirementCredits;
-    if (remainingCredits <= 0) continue;
-
-    const countsAsExternal =
-      matchedChoiceRequirement ||
-      (!isHomeDepartmentCourse(course, profile) &&
-        !(isDfllProfile(profile) && isDfllDepartmentRequirementCourse(course)) &&
-        !(isDfllProfile(profile) && isDfllDigitalHumanitiesCourseForAdmissionYear(course, admissionYear)) &&
-        !(isDfllProfile(profile) && isDfllCollegeEmiCourseForAdmissionYear(course, admissionYear)) &&
-        !isGeneralRequirementCategory(category, profile));
-
-    if (countsAsExternal) {
-      externalCredits += remainingCredits;
-      externalCourseCandidates.push({ course, credits: remainingCredits });
-    } else {
-      baseCredits += remainingCredits;
-    }
-  }
-
-  generalEducationCredits = generalEducationCandidates.reduce((sum, candidate) => sum + candidate.credits, 0);
-
-  const buildExternalCourseAudits = (acceptedExternalCredits: number) => {
-    let remainingAcceptedCredits = acceptedExternalCredits;
-    return externalCourseCandidates.map(({ course, credits }) => {
-      const acceptedCredits = Math.min(credits, remainingAcceptedCredits);
-      remainingAcceptedCredits -= acceptedCredits;
-      const uncountedCredits = Math.max(credits - acceptedCredits, 0);
-      addUncountedCourseAudit(course, acceptedCredits, uncountedCredits, `外系學分超過${profile.externalCreditLimit ?? acceptedExternalCredits}學分上限，超出部分不計入畢業學分。`);
-      return {
-        course,
-        credits,
-        acceptedCredits,
-        uncountedCredits,
-      };
-    });
-  };
-
-  if (isDfllProfile(profile)) {
-    const languageLiteracyRequired = profile.languageLiteracyRequirements.reduce((sum, requirement) => sum + requirement.requiredCredits, 0);
-    const infoRequired = studentStatus === "foreign" ? 0 : 1;
-    const requiredGeneralEducationCredits = languageLiteracyRequired + 3 + infoRequired + 6 + 4;
-    const acceptedGeneralEducationCredits = Math.min(
-      generalEducationCredits,
-      requiredGeneralEducationCredits + dfllGeneralEdOverflowExternalLimit,
-    );
-    const generalEducationOverflowCredits = Math.max(generalEducationCredits - requiredGeneralEducationCredits, 0);
-    const acceptedGeneralEducationOverflowCredits = Math.min(generalEducationOverflowCredits, dfllGeneralEdOverflowExternalLimit);
-    baseCredits += acceptedGeneralEducationCredits;
-    excludedCredits += Math.max(generalEducationCredits - acceptedGeneralEducationCredits, 0);
-    let remainingAcceptedGeneralEducationCredits = acceptedGeneralEducationCredits;
-    for (const { course, credits } of generalEducationCandidates) {
-      const acceptedCredits = Math.min(credits, remainingAcceptedGeneralEducationCredits);
-      remainingAcceptedGeneralEducationCredits -= acceptedCredits;
-      addUncountedCourseAudit(
-        course,
-        acceptedCredits,
-        Math.max(credits - acceptedCredits, 0),
-        `通識課程已超過需求，通識課程超修最多採計${dfllGeneralEdOverflowExternalLimit}學分。`,
-      );
-    }
-
-    const acceptedExternalCredits = Math.min(externalCredits, profile.externalCreditLimit ?? externalCredits);
-    const externalCourseAudits = buildExternalCourseAudits(acceptedExternalCredits);
-    return {
-      completed: baseCredits + acceptedExternalCredits,
-      externalCredits,
-      acceptedExternalCredits,
-      externalOverLimit: Math.max(externalCredits - (profile.externalCreditLimit ?? externalCredits), 0),
-      externalCourseAudits,
-      generalEducationCredits,
-      acceptedGeneralEducationOverflowCredits,
-      generalEducationOverflowCredits,
-      excludedCredits,
-      choiceRequirementAudits,
-      uncountedCourseAudits,
-    };
-  }
-
-  baseCredits += generalEducationCredits;
-  const acceptedExternalCredits = Math.min(externalCredits, profile.externalCreditLimit ?? externalCredits);
-  const externalCourseAudits = buildExternalCourseAudits(acceptedExternalCredits);
-  return {
-    completed: baseCredits + acceptedExternalCredits,
-    externalCredits,
-    acceptedExternalCredits,
-    externalOverLimit: Math.max(externalCredits - (profile.externalCreditLimit ?? externalCredits), 0),
-    externalCourseAudits,
-    generalEducationCredits,
-    acceptedGeneralEducationOverflowCredits: 0,
-    generalEducationOverflowCredits: 0,
-    excludedCredits,
-    choiceRequirementAudits,
-    uncountedCourseAudits,
-  };
-};
-
-const withCourseDefaults = (
-  course: Partial<TranscriptCourse> & Pick<TranscriptCourse, "name" | "credits" | "grade">,
-  profile: RequirementProfile = fallbackRequirementProfile,
-): TranscriptCourse => ({
-  courseNo: course.courseNo ?? "",
-  semester: course.semester ?? "",
-  ...course,
-  score: course.score ?? "",
-  type: course.type ?? "",
-  typeLabel: course.typeLabel ?? (course.type ? typeLabels[course.type] ?? course.type : ""),
-  category: course.category ?? (course.type === "體" || course.type === "服" ? profile.nonGraduationRequirement?.category ?? "體育/服務學習" : inferCategory(course.name, profile, course.offeredBy)),
-  offeredBy: course.offeredBy ?? "",
-  emi: course.emi ?? false,
-  genEdProfessorFromMajorDepartment: course.genEdProfessorFromMajorDepartment ?? false,
-  planId: course.planId ?? defaultPlanId,
-});
-
-const normalizePasteText = (value: string) =>
-  value
-    .normalize("NFKC")
-    .replace(/⼀/g, "一")
-    .replace(/⼆/g, "二")
-    .replace(/⼤/g, "大")
-    .replace(/⽤/g, "用")
-    .replace(/⾔/g, "言")
-    .replace(/⼼/g, "心")
-    .replace(/⽬/g, "目")
-    .replace(/⾨/g, "門")
-    .replace(/⼯/g, "工")
-    .replace(/⻄/g, "西")
-    .replace(/[ \t　]+/g, " ")
-    .trim();
-
-const parseStructuredRows = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
-  const rows = text
-    .split(/\r?\n/)
-    .map((line) => normalizePasteText(line))
-    .filter(Boolean);
-
-  return rows
-    .map((row) => {
-      const columns = row
-        .split(/\t|,|，/)
-        .map((column) => column.trim())
-        .filter(Boolean);
-
-      if (columns.length >= 4) {
-        const [semester, name, credits, grade] = columns;
-        const parsedCredits = Number(credits);
-        return withCourseDefaults({
-          semester,
-          name,
-          credits: parsedCredits,
-          grade: normalizeGrade(grade),
-        }, profile);
-      }
-
-      if (columns.length === 3) {
-        const [name, credits, grade] = columns;
-        const parsedCredits = Number(credits);
-        return withCourseDefaults({
-          name,
-          credits: parsedCredits,
-          grade: normalizeGrade(grade),
-        }, profile);
-      }
-
-      const looseMatch = row.match(/^(.+?)\s+([0-6](?:\.[05])?)\s+([A-F][+-]?|P|W|抵)$/i);
-      if (!looseMatch) return undefined;
-
-      return withCourseDefaults({
-        name: looseMatch[1].trim(),
-        credits: Number(looseMatch[2]),
-        grade: normalizeGrade(looseMatch[3]),
-      }, profile);
-    })
-    .filter((course): course is TranscriptCourse => Boolean(course?.name && course.credits > 0));
-};
-
-const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => normalizePasteText(line))
-    .filter(Boolean);
-  const courses: TranscriptCourse[] = [];
-  let currentBlock: string[] = [];
-  const categoryLabels = [
-    "人文領域",
-    "社會科學領域",
-    "自然科學領域",
-    "統合領域",
-    "核心素養",
-    "資訊素養",
-    "全校可選修",
-    "專業領域微課程",
-    "體育",
-  ];
-
-  const isCourseStart = (line: string) => /^([A-Z]?\d{4,6}|抵)\s*(必|選|通|體|服|Req|Elec|Gen|P\.?E\.?|Service)?$/i.test(line);
-  const scoreMatch = (line: string) =>
-    line.match(/^([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s*([A-F][+-]?|P|W|抵|-)\s*([YN-])(?:\s+.*)?$/i) ??
-    line.match(/(?:^|\s)([0-6](?:\.[05])?)\s*(抵)$/i);
-  const compactLine = (line: string) => line.replace(/\s+/g, "");
-  const cleanOfferedBy = (line: string) =>
-    line.match(/([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? line;
-  const isNoiseLine = (line: string) =>
-    /^(選課|號碼|Course|No|課程別|Category|科目名稱|Course Name|課程分類|Classify|開課系所|Offered Dept\.?|學分|Credits|成績|Score|等|第|GPA|EMI|課|程)$/.test(line) ||
-    /(人文領域|社會科學領域|自然科學領域|核心素養|通識自由選|全校可選修|統合領域|專業領域微課程|通識中心|語言中心|體育室|學務處|外文系|Department|College|Office|Center|Humanistic|General Education|Category)/i.test(line);
-
-  const findWrappedCategory = (chineseLines: string[]) => {
-    const domainLabels = ["統合領域", "人文領域", "社會科學領域", "自然科學領域", "核心素養", "資訊素養", "專業領域微課程", "體育"];
-
-    for (let start = 0; start < chineseLines.length; start += 1) {
-      let joined = "";
-      for (let end = start; end < Math.min(start + 3, chineseLines.length); end += 1) {
-        joined += compactLine(chineseLines[end]);
-        const label = categoryLabels.find((category) => joined === category);
-        if (label) return { label, start, end };
-
-        const matchedDomain = domainLabels.find((category) => joined.endsWith(category));
-        if (matchedDomain && /^通識自由選修?\//.test(joined)) {
-          return { label: matchedDomain, start, end };
-        }
-      }
-    }
-    return undefined;
-  };
-
-  const flushBlock = () => {
-    if (currentBlock.length === 0) return;
-    const block = currentBlock;
-    currentBlock = [];
-
-    const scoreLine = block.find((line) => scoreMatch(line));
-    const matchedScore = scoreLine ? scoreMatch(scoreLine) : undefined;
-    if (!matchedScore) return;
-
-    const startMatch = block[0].match(/^([A-Z]?\d{4,6}|抵)\s*(必|選|通|體|服)?/);
-    const chineseLines = block
-      .slice(1)
-      .filter((line) => line !== scoreLine)
-      .filter((line) => /[\u4e00-\u9fff]/.test(line));
-
-    const categoryMatch = findWrappedCategory(chineseLines);
-    const category =
-      categoryMatch?.label === "體育"
-        ? profile.nonGraduationRequirement?.category ?? "體育/服務學習"
-        : categoryMatch?.label === "全校可選修"
-          ? "其他"
-          : categoryMatch?.label;
-    const offeredByIndex = chineseLines.findIndex((line) => /(?:夜外文|系|所|學程|中心|院|體育室|學務處)$/.test(line) && line !== category);
-    const offeredBy = offeredByIndex >= 0 ? cleanOfferedBy(chineseLines[offeredByIndex]) : "";
-    const nameEnd =
-      categoryMatch?.start ??
-      (offeredByIndex >= 0 ? offeredByIndex : chineseLines.length);
-    const name = chineseLines
-      .slice(0, nameEnd)
-      .filter((line) => !isNoiseLine(line))
-      .map(compactLine)
-      .join("");
-    if (!name) return;
-
-    courses.push(withCourseDefaults({
-      courseNo: startMatch?.[1] === "抵" ? "" : startMatch?.[1] ?? "",
-      type: startMatch?.[2] ?? "",
-      semester: "",
-      name,
-      credits: Number(matchedScore[1]),
-      score: matchedScore[3] ? matchedScore[2] : "",
-      grade: normalizeGrade(matchedScore[3] ?? matchedScore[2]),
-      category: category ?? inferCategory(name, profile, offeredBy),
-      offeredBy: offeredBy ?? "",
-      emi: matchedScore[4]?.toUpperCase() === "Y",
-    }, profile));
-  };
-
-  for (const line of lines) {
-
-    if (isCourseStart(line)) {
-      flushBlock();
-      currentBlock = [line];
-      continue;
-    }
-
-    if (currentBlock.length > 0) {
-      currentBlock.push(line);
-      if (scoreMatch(line)) flushBlock();
-    }
-  }
-
-  flushBlock();
-  return courses;
-};
-
-const parsePastedCourses = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
-  const structuredCourses = parseStructuredRows(text, profile);
-  const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
-  return [...structuredCourses, ...copiedTranscriptCourses];
-};
+import { parsePastedCourses } from "../parsing/transcriptParser";
+import { CourseTable } from "./credit-calculator/CourseTable";
 
 export function CreditCalculator() {
   const { courses, profile, plans, setPlans, setTranscript, clearTranscript } = useTranscript();
@@ -695,6 +60,11 @@ export function CreditCalculator() {
   const [selectedPlanDetail, setSelectedPlanDetail] = useState("");
   const [selectedProgramPlanId, setSelectedProgramPlanId] = useState(optionalProgramPlans[0]?.id ?? "");
   const requirementProfile = useMemo(() => getRequirementProfile(selectedDepartment), [selectedDepartment]);
+  const selectedDepartmentRequirement = useMemo(
+    () => allDepartments.find((dept) => dept.name === selectedDepartment),
+    [selectedDepartment],
+  );
+  const supportedAdmissionYears = selectedDepartmentRequirement?.supportedAdmissionYears ?? [admissionYear];
 
   const groupedCredits = useMemo(() => {
     const groups = Object.fromEntries(categoryOptions.map((category) => [category, 0])) as Record<string, number>;
@@ -750,13 +120,15 @@ export function CreditCalculator() {
     () =>
       plans.map((plan) => {
         const assignedPlanCourses = sortCoursesChronologically(courses.filter((course) => course.planId === plan.id));
+        const programRules = getProgramCourseRules(plan.id);
+        const hasConfiguredProgramRules = programRules.length > 0;
         const planCourses =
-          plan.id === digitalHumanitiesProgramId
+          hasConfiguredProgramRules
             ? sortCoursesChronologically(courses)
             : assignedPlanCourses;
         const programRecognizedCourses =
-          plan.id === digitalHumanitiesProgramId
-            ? planCourses.filter((course) => isDigitalHumanitiesProgramCourse(course) && normalizeGrade(course.grade) !== "抵")
+          hasConfiguredProgramRules
+            ? planCourses.filter((course) => isConfiguredProgramPlanCourse(plan.id, course, matchesAnyName) && normalizeGrade(course.grade) !== "抵")
             : planCourses;
         const countedPlanCourses = programRecognizedCourses.filter((course) => countableCredits(course, requirementProfile) > 0);
         const completed =
@@ -766,12 +138,18 @@ export function CreditCalculator() {
         const nonRequiredCredits =
           plan.id === digitalHumanitiesProgramId
             ? countedPlanCourses
-              .filter((course) => !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus))
+              .filter((course) =>
+                !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus, fallbackRequirementProfile, {
+                  compactCourseText,
+                  getCourseCategory,
+                  matchesAnyName,
+                }),
+              )
               .reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0)
             : 0;
         const unrecognizedCourses =
-          plan.id === digitalHumanitiesProgramId
-            ? assignedPlanCourses.filter((course) => !isDigitalHumanitiesProgramCourse(course) || normalizeGrade(course.grade) === "抵")
+          hasConfiguredProgramRules
+            ? assignedPlanCourses.filter((course) => !isConfiguredProgramPlanCourse(plan.id, course, matchesAnyName) || normalizeGrade(course.grade) === "抵")
             : [];
         const requirementRemaining =
           plan.id === digitalHumanitiesProgramId
@@ -838,196 +216,242 @@ export function CreditCalculator() {
     [primaryCreditAudit],
   );
 
+  const mechanicalCoreRequirement = useMemo(() => {
+    return getMechanicalCoreRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const mechanicalGeneralEducationRequirement = useMemo(() => {
+    return getMechanicalGeneralEducationRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const mechanicalRequiredProfessionalRequirement = useMemo(() => {
+    return getMechanicalRequiredProfessionalRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const mechanicalProfessionalElectiveRequirement = useMemo(() => {
+    return getMechanicalProfessionalElectiveRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const mechanicalAdditionalCollegeRequirement = useMemo(() => {
+    return getMechanicalAdditionalCollegeRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const plantPathologyGeneralEducationRequirement = useMemo(() => {
+    return getPlantPathologyGeneralEducationRequirement({
+      courses,
+      requirementProfile,
+      studentStatus,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile, studentStatus]);
+
+  const plantPathologyRequiredProfessionalRequirement = useMemo(() => {
+    return getPlantPathologyRequiredProfessionalRequirement({
+      courses,
+      requirementProfile,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, requirementProfile]);
+
+  const plantPathologyProfessionalElectiveRequirement = useMemo(() => {
+    return getPlantPathologyProfessionalElectiveRequirement({
+      courses,
+      requirementProfile,
+      requiredProfessionalCourses: plantPathologyRequiredProfessionalRequirement?.acceptedCourses ?? [],
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, plantPathologyRequiredProfessionalRequirement, requirementProfile]);
+
+  const plantPathologyOtherGraduationRequirement = useMemo(() => {
+    return getPlantPathologyOtherGraduationRequirement({
+      courses,
+      requirementProfile,
+      usedCourses: [
+        ...(plantPathologyGeneralEducationRequirement?.courses ?? []),
+        ...(plantPathologyRequiredProfessionalRequirement?.acceptedCourses ?? []),
+        ...(plantPathologyProfessionalElectiveRequirement?.acceptedCourses ?? []),
+      ],
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getCourseCategory,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
+      },
+    });
+  }, [courses, plantPathologyGeneralEducationRequirement, plantPathologyProfessionalElectiveRequirement, plantPathologyRequiredProfessionalRequirement, requirementProfile]);
+
   const dfllRequirementAudits = useMemo(() => {
-    if (!isDfllProfile(requirementProfile)) return undefined;
-    const mainCourses = sortCoursesChronologically(courses.filter((course) => course.planId === defaultPlanId));
-    const eligibleCourses = sortCoursesChronologically(
-      mainCourses.filter(
-        (course) =>
-          countableCredits(course, requirementProfile) > 0 &&
-          !isCommonEnglishCourse(course) &&
-          !course.genEdProfessorFromMajorDepartment,
-      ),
-    );
-    const sumByCategory = (category: string) =>
-      eligibleCourses
-        .filter((course) => getCourseCategory(course, requirementProfile) === category)
-        .reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const countByCategory = (category: string) =>
-      eligibleCourses.filter((course) => getCourseCategory(course, requirementProfile) === category).length;
-    const sumByNames = (names: string[]) =>
-      eligibleCourses
-        .filter((course) => matchesAnyName(course.name, names))
-        .reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const detailByCategory = (category: string) =>
-      eligibleCourses.filter((course) => getCourseCategory(course, requirementProfile) === category);
-    const detailByNames = (names: string[]) =>
-      eligibleCourses.filter((course) => matchesAnyName(course.name, names));
-    const overflowByNames = (names: string[], protectedCredits: number) => {
-      let remainingProtectedCredits = protectedCredits;
-      return eligibleCourses.filter((course) => {
-        if (!matchesAnyName(course.name, names)) return false;
-        const credits = countableCredits(course, requirementProfile);
-        const protectedForCourse = Math.min(credits, remainingProtectedCredits);
-        remainingProtectedCredits -= protectedForCourse;
-        return credits - protectedForCourse > 0;
-      });
-    };
-    const isChoiceRequirementCourse = (course: TranscriptCourse) =>
-      requirementProfile.choiceCreditRequirements.some((requirement) => getChoiceRequirementOption(course, requirement));
-    const requiredProfessionalCourses = eligibleCourses.filter(
-      (course) =>
-        isDfllRequiredNamedProfessionalCourse(course) ||
-        isDfllBritishAmericanLiteratureCourse(course) ||
-        isChoiceRequirementCourse(course),
-    );
-    const professionalElectiveBaseCourses = eligibleCourses.filter(
-      (course) =>
-        isHomeDepartmentCourse(course, requirementProfile) &&
-        !isDfllRequiredNamedProfessionalCourse(course) &&
-        !isDfllBritishAmericanLiteratureCourse(course) &&
-        !isChoiceRequirementCourse(course),
-    );
-
-    const humanSocialNaturalCredits =
-      sumByCategory("人文領域") + sumByCategory("社會科學領域") + sumByCategory("自然科學領域");
-    const infoLiteracyCourses = eligibleCourses.filter(
-      (course) => getCourseCategory(course, requirementProfile) === "資訊素養" || compactCourseText(course.name).includes(compactCourseText("資訊素養")),
-    );
-    const infoLiteracyCredits = infoLiteracyCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const britishAmericanLiteratureCredits = sumByNames(dfllBritishAmericanLiteratureCourses);
-    const britishAmericanLiteratureOverflowCredits = Math.max(britishAmericanLiteratureCredits - 12, 0);
-    const digitalHumanitiesCourses = eligibleCourses.filter((course) =>
-      isDfllDigitalHumanitiesCourseForAdmissionYear(course, admissionYear),
-    );
-    const digitalHumanitiesCredits = digitalHumanitiesCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const collegeEmiCourses = eligibleCourses.filter((course) =>
-      isDfllCollegeEmiCourseForAdmissionYear(course, admissionYear),
-    );
-    const collegeEmiCredits = collegeEmiCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const requiredNamedCredits = dfllRequiredProfessionalCourses.reduce((sum, requirement) => {
-      return sum + getFullYearCompletedCredits(eligibleCourses, requirement.aliases, requirement.requiredCredits, requirementProfile);
-    }, 0);
-    const secondLanguageCredits = Math.max(
-      ...choiceRequirementViews.flatMap((view) => view.options.map((option) => Math.min(option.completed, view.requirement.requiredCredits))),
-      0,
-    );
-    const requiredProfessionalCredits = requiredNamedCredits + Math.min(britishAmericanLiteratureCredits, 12) + secondLanguageCredits;
-    const professionalElectiveBaseCredits = professionalElectiveBaseCourses.reduce((sum, course) => sum + countableCredits(course, requirementProfile), 0);
-    const professionalElectiveCredits = professionalElectiveBaseCredits + britishAmericanLiteratureOverflowCredits;
-    const britishAmericanLiteratureOverflowCourses = overflowByNames(dfllBritishAmericanLiteratureCourses, 12);
-    const professionalElectiveCourses =
-      britishAmericanLiteratureOverflowCredits > 0
-        ? [...professionalElectiveBaseCourses, ...britishAmericanLiteratureOverflowCourses]
-        : professionalElectiveBaseCourses;
-    const noExternalCourses = primaryCreditAudit.externalCredits === 0;
-
-    return {
-      core: { completed: sumByCategory("核心素養"), required: 3, courses: detailByCategory("核心素養") },
-      info: { completed: infoLiteracyCredits, required: studentStatus === "foreign" ? 0 : 1, courses: infoLiteracyCourses },
-      humanities: { completedCourses: countByCategory("人文領域"), completedCredits: sumByCategory("人文領域"), courses: detailByCategory("人文領域") },
-      social: { completedCourses: countByCategory("社會科學領域"), completedCredits: sumByCategory("社會科學領域"), courses: detailByCategory("社會科學領域") },
-      natural: { completedCourses: countByCategory("自然科學領域"), completedCredits: sumByCategory("自然科學領域"), courses: detailByCategory("自然科學領域") },
-      humanSocialNaturalCredits,
-      humanSocialNaturalCourses: [...detailByCategory("人文領域"), ...detailByCategory("社會科學領域"), ...detailByCategory("自然科學領域")],
-      comprehensive: { completed: sumByCategory("統合領域"), required: 4, courses: detailByCategory("統合領域") },
-      digitalHumanities: { completed: digitalHumanitiesCredits, required: 2, courses: digitalHumanitiesCourses },
-      collegeEmi: {
-        completed: collegeEmiCredits,
-        required: 2,
-        courses: collegeEmiCourses,
+    return getDfllRequirementAudits({
+      admissionYear,
+      choiceRequirementViews,
+      courses,
+      primaryExternalCredits: primaryCreditAudit.externalCredits,
+      requirementProfile,
+      studentStatus,
+      helpers: {
+        compactCourseText,
+        countableCredits,
+        getChoiceRequirementOption,
+        getCourseCategory,
+        getSemesterTerm,
+        isHomeDepartmentCourse,
+        matchesAnyName,
+        sortCoursesChronologically,
       },
-      collegeRequired: {
-        completed: Math.min(digitalHumanitiesCredits, 2) + Math.min(collegeEmiCredits, 2),
-        required: 4,
-        courses: Array.from(new Set([...digitalHumanitiesCourses, ...collegeEmiCourses])),
-      },
-      requiredProfessional: { completed: requiredProfessionalCredits, required: 46, courses: requiredProfessionalCourses },
-      professionalElective: { completed: professionalElectiveCredits, required: 32, courses: professionalElectiveCourses },
-      professionalElectiveIfNoExternal: {
-        enabled: noExternalCourses,
-        completed: professionalElectiveCredits,
-        required: 52,
-      },
-      britishAmericanLiterature: {
-        completed: britishAmericanLiteratureCredits,
-        required: 12,
-        courses: detailByNames(dfllBritishAmericanLiteratureCourses),
-        overflowCourses: britishAmericanLiteratureOverflowCourses,
-      },
-    };
+    });
   }, [admissionYear, choiceRequirementViews, courses, primaryCreditAudit.externalCredits, requirementProfile, studentStatus]);
 
-  const dfllRequirementRows = useMemo(() => {
-    if (!dfllRequirementAudits) return [];
-    const rows = [
-      {
-        id: "core",
-        label: "核心素養",
-        summary: `${dfllRequirementAudits.core.completed} / ${dfllRequirementAudits.core.required} 學分`,
-        courses: dfllRequirementAudits.core.courses,
-      },
-      {
-        id: "info",
-        label: "資訊素養",
-        summary: dfllRequirementAudits.info.required === 0 ? "外籍生免修" : `${dfllRequirementAudits.info.completed} / ${dfllRequirementAudits.info.required} 學分`,
-        courses: dfllRequirementAudits.info.courses,
-      },
-      {
-        id: "hsn",
-        label: "人文/社會/自然",
-        summary: `${dfllRequirementAudits.humanSocialNaturalCredits} / 6 學分`,
-        courses: dfllRequirementAudits.humanSocialNaturalCourses,
-      },
-      {
-        id: "comprehensive",
-        label: "統合領域",
-        summary: `${dfllRequirementAudits.comprehensive.completed} / ${dfllRequirementAudits.comprehensive.required} 學分`,
-        courses: dfllRequirementAudits.comprehensive.courses,
-      },
-      {
-        id: "college-required",
-        label: "院專業必修課程",
-        summary: `數位人文 ${dfllRequirementAudits.digitalHumanities.completed} / ${dfllRequirementAudits.digitalHumanities.required}，EMI ${dfllRequirementAudits.collegeEmi.completed} / ${dfllRequirementAudits.collegeEmi.required} 學分`,
-        courses: dfllRequirementAudits.collegeRequired.courses,
-      },
-      {
-        id: "required-professional",
-        label: "系專業必修",
-        summary: `${dfllRequirementAudits.requiredProfessional.completed} / ${dfllRequirementAudits.requiredProfessional.required} 學分`,
-        courses: dfllRequirementAudits.requiredProfessional.courses,
-      },
-      {
-        id: "british-american-literature",
-        label: "英美文學",
-        summary: `${dfllRequirementAudits.britishAmericanLiterature.completed} / ${dfllRequirementAudits.britishAmericanLiterature.required} 學分`,
-        courses: dfllRequirementAudits.britishAmericanLiterature.courses,
-      },
-      {
-        id: "professional-elective",
-        label: "系專業選修",
-        summary: `${dfllRequirementAudits.professionalElective.completed} / ${dfllRequirementAudits.professionalElective.required} 學分`,
-        courses: dfllRequirementAudits.professionalElective.courses,
-      },
-    ];
-
-    if (dfllRequirementAudits.professionalElectiveIfNoExternal.enabled) {
-      rows.push({
-        id: "professional-elective-no-external",
-        label: "未選外系時本系專業選修",
-        summary: `${dfllRequirementAudits.professionalElectiveIfNoExternal.completed} / ${dfllRequirementAudits.professionalElectiveIfNoExternal.required} 學分`,
-        courses: dfllRequirementAudits.professionalElective.courses,
-      });
-    }
-    return rows;
-  }, [dfllRequirementAudits]);
+  const dfllRequirementRows = useMemo(() => getDfllRequirementRows(dfllRequirementAudits), [dfllRequirementAudits]);
 
   const selectedDfllRequirementRow = dfllRequirementRows.find((row) => row.id === selectedDfllRequirementDetail);
   const primaryRequirementsFulfilled = (() => {
     const languageDone = languageLiteracyRequirements.every((requirement) => requirement.completed >= requirement.requiredCredits);
     const nonGraduationDone = !nonGraduationRequirement || nonGraduationRequirement.done;
     const choiceRequirementsDone = choiceRequirementViews.every((view) => Boolean(view.completedOption));
-    if (!dfllRequirementAudits) return languageDone && nonGraduationDone && choiceRequirementsDone;
+    const mechanicalCoreDone = !mechanicalCoreRequirement || mechanicalCoreRequirement.completed >= mechanicalCoreRequirement.required;
+    const mechanicalGeneralEducationDone =
+      !mechanicalGeneralEducationRequirement ||
+      (
+        mechanicalGeneralEducationRequirement.completed >= mechanicalGeneralEducationRequirement.required &&
+        mechanicalGeneralEducationRequirement.subRequirements.every((requirement) =>
+          requirement.done === undefined ? requirement.completed >= requirement.required : requirement.done,
+        )
+      );
+    const mechanicalRequiredProfessionalDone =
+      !mechanicalRequiredProfessionalRequirement ||
+      mechanicalRequiredProfessionalRequirement.completed >= mechanicalRequiredProfessionalRequirement.required;
+    const mechanicalProfessionalElectiveDone =
+      !mechanicalProfessionalElectiveRequirement ||
+      (
+        mechanicalProfessionalElectiveRequirement.completed >= mechanicalProfessionalElectiveRequirement.required &&
+        mechanicalProfessionalElectiveRequirement.subRequirements.every((requirement) => {
+          const creditsDone = requirement.completed >= requirement.required;
+          const courseCountDone =
+            requirement.requiredCourseCount === undefined ||
+            (requirement.courseCount ?? 0) >= requirement.requiredCourseCount;
+          const groupsDone =
+            requirement.groupRequirements === undefined ||
+            requirement.groupRequirements.every((group) => group.completed >= group.required);
+          return creditsDone && courseCountDone && groupsDone;
+        })
+      );
+    const mechanicalAdditionalCollegeDone =
+      !mechanicalAdditionalCollegeRequirement ||
+      mechanicalAdditionalCollegeRequirement.completed >= mechanicalAdditionalCollegeRequirement.required;
+    const plantPathologyGeneralEducationDone =
+      !plantPathologyGeneralEducationRequirement ||
+      (
+        plantPathologyGeneralEducationRequirement.completed >= plantPathologyGeneralEducationRequirement.required &&
+        plantPathologyGeneralEducationRequirement.subRequirements.every((requirement) =>
+          requirement.done === undefined ? requirement.completed >= requirement.required : requirement.done,
+        )
+      );
+    const plantPathologyRequiredProfessionalDone =
+      !plantPathologyRequiredProfessionalRequirement ||
+      (
+        plantPathologyRequiredProfessionalRequirement.completed >= plantPathologyRequiredProfessionalRequirement.required &&
+        plantPathologyRequiredProfessionalRequirement.choiceRequirements.every((requirement) =>
+          requirement.completedCourseCount >= requirement.requiredCourseCount,
+        )
+      );
+    const plantPathologyProfessionalElectiveDone =
+      !plantPathologyProfessionalElectiveRequirement ||
+      plantPathologyProfessionalElectiveRequirement.completed >= plantPathologyProfessionalElectiveRequirement.required;
+    const plantPathologyOtherGraduationDone =
+      !plantPathologyOtherGraduationRequirement ||
+      plantPathologyOtherGraduationRequirement.completed >= plantPathologyOtherGraduationRequirement.required;
+    const baseRequirementsDone =
+      languageDone &&
+      nonGraduationDone &&
+      choiceRequirementsDone &&
+      mechanicalCoreDone &&
+      mechanicalGeneralEducationDone &&
+      mechanicalRequiredProfessionalDone &&
+      mechanicalProfessionalElectiveDone &&
+      mechanicalAdditionalCollegeDone &&
+      plantPathologyGeneralEducationDone &&
+      plantPathologyRequiredProfessionalDone &&
+      plantPathologyProfessionalElectiveDone &&
+      plantPathologyOtherGraduationDone;
+    if (!dfllRequirementAudits) return baseRequirementsDone;
 
     const dfllDone =
       dfllRequirementAudits.core.completed >= dfllRequirementAudits.core.required &&
@@ -1045,7 +469,7 @@ export function CreditCalculator() {
       (!dfllRequirementAudits.professionalElectiveIfNoExternal.enabled ||
         dfllRequirementAudits.professionalElectiveIfNoExternal.completed >= dfllRequirementAudits.professionalElectiveIfNoExternal.required);
 
-    return languageDone && nonGraduationDone && choiceRequirementsDone && dfllDone;
+    return baseRequirementsDone && dfllDone;
   })();
   const primaryStatusIncomplete = primaryRemaining > 0 || !primaryRequirementsFulfilled;
 
@@ -1145,7 +569,7 @@ export function CreditCalculator() {
   };
 
   const handleAdmissionYearChange = (year: number) => {
-    const safeYear = Math.max(year, firstSupportedAdmissionYear);
+    const safeYear = supportedAdmissionYears.includes(year) ? year : supportedAdmissionYears[0] ?? firstSupportedAdmissionYear;
     const nextSemesterOptions = getSemesterOptions(safeYear);
     setAdmissionYear(safeYear);
     setPasteSemester(nextSemesterOptions[0]);
@@ -1159,20 +583,6 @@ export function CreditCalculator() {
       profile: { name: "", department: selectedDepartment, studentStatus, admissionYear: safeYear },
       plans: nextPlans,
     });
-  };
-
-  const addPlan = (type: Exclude<RequirementPlanType, "program">) => {
-    const id = `${type}-${Date.now()}`;
-    setPlans([
-      ...plans,
-      {
-        id,
-        type,
-        name: planTypeLabels[type],
-        requiredCredits: type === "minor" ? 20 : 30,
-        source: "custom",
-      },
-    ]);
   };
 
   const addProgramPlan = (programId: string) => {
@@ -1245,6 +655,16 @@ export function CreditCalculator() {
   const handleDepartmentChange = (department: string) => {
     setSelectedDepartment(department);
     const match = allDepartments.find((dept) => dept.name === department);
+    const nextSupportedAdmissionYears = match?.supportedAdmissionYears ?? [match?.admissionYear ?? admissionYear];
+    const nextAdmissionYear = nextSupportedAdmissionYears.includes(admissionYear)
+      ? admissionYear
+      : nextSupportedAdmissionYears[0] ?? match?.admissionYear ?? admissionYear;
+    const nextSemesterOptions = getSemesterOptions(nextAdmissionYear);
+    setAdmissionYear(nextAdmissionYear);
+    setPasteSemester(nextSemesterOptions[0]);
+    const nextCourses = courses.map((course) =>
+      nextSemesterOptions.includes(course.semester) ? course : { ...course, semester: "" },
+    );
     const nextPlans = plans.map((plan) =>
       plan.id === defaultPlanId
         ? {
@@ -1252,37 +672,51 @@ export function CreditCalculator() {
           name: department || "主修",
           requiredCredits: match?.credits ?? 128,
           source: match ? "catalog" : "custom",
+          admissionYear: nextAdmissionYear,
+          sourceUrl: match?.sourceUrl,
+          notes: match?.notes,
+          manualChecks: match?.manualChecks,
         }
         : plan,
     );
     setPlans(nextPlans);
     setTranscript({
-      courses,
+      courses: nextCourses,
       rawText: "",
-      profile: { name: "", department, studentStatus, admissionYear },
+      profile: { name: "", department, studentStatus, admissionYear: nextAdmissionYear },
       plans: nextPlans,
     });
   };
 
   return (
-    <div className="px-2 py-3 pb-6 md:px-3">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
-          <Calculator className="text-white" size={18} />
+    <div className="mx-auto max-w-[1600px] px-3 py-4 pb-24 sm:px-4 lg:px-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
+            <Calculator className="text-white" size={18} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white sm:text-xl">剩餘學分計算</h1>
+            <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+              {selectedDepartment || "未選擇系所"} / {admissionYear} 入學
+            </p>
+          </div>
         </div>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">剩餘學分計算</h1>
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <span className="font-medium text-gray-900 dark:text-white">{primaryCompleted}</span>
+          <span>/ {primaryPlan?.requiredCredits ?? 128} 學分</span>
+        </div>
       </div>
 
-      <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
-          <div className="min-w-0 overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors">
+          <div className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
             <label className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">主修系所</label>
             <select
               value={selectedDepartment}
               onChange={(event) => handleDepartmentChange(event.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm transition-colors"
             >
-              <option value="">外國語文學系 / 128 學分</option>
               {Object.entries(departmentCredits).map(([college, departments]) => (
                 <optgroup key={college} label={college}>
                   {departments.map((department) => (
@@ -1293,7 +727,7 @@ export function CreditCalculator() {
                 </optgroup>
               ))}
             </select>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">入學學年度</label>
                 <select
@@ -1307,46 +741,39 @@ export function CreditCalculator() {
                 </select>
               </div>
               <div>
-              <label className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">學生身分</label>
-              <select
-                value={studentStatus}
-                onChange={(event) => {
-                  const nextStatus = event.target.value as "local" | "foreign";
-                  setStudentStatus(nextStatus);
-                  setTranscript({
-                    courses,
-                    rawText: "",
-                    profile: { name: "", department: selectedDepartment, studentStatus: nextStatus, admissionYear },
-                    plans,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm transition-colors"
-              >
-                <option value="local">本國生</option>
-                <option value="foreign">外籍生（資訊素養免修）</option>
-              </select>
+                <label className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">學生身分</label>
+                <select
+                  value={studentStatus}
+                  onChange={(event) => {
+                    const nextStatus = event.target.value as "local" | "foreign";
+                    setStudentStatus(nextStatus);
+                    setTranscript({
+                      courses,
+                      rawText: "",
+                      profile: { name: "", department: selectedDepartment, studentStatus: nextStatus, admissionYear },
+                      plans,
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm transition-colors"
+                >
+                  <option value="local">本國生</option>
+                  <option value="foreign">{isDfllProfile(requirementProfile) ? "外籍生（資訊素養免修）" : "外籍生"}</option>
+                </select>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">畢業條件方案</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">主修來自系所總學分；輔修、雙主修可手動設定，學程可依需要加入。</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">主修來自系所總學分；學程可依需要加入。</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => addPlan("minor")} className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200">
-                  加輔修
-                </button>
-                <button onClick={() => addPlan("double-major")} className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200">
-                  加雙主修
-                </button>
-                <div className="flex items-center gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:items-center lg:justify-end">
                   <select
                     value={selectedProgramPlanId}
                     onChange={(event) => setSelectedProgramPlanId(event.target.value)}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    className="min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                     aria-label="選擇學程"
                   >
                     {optionalProgramPlans.map((program) => (
@@ -1358,16 +785,15 @@ export function CreditCalculator() {
                   <button
                     onClick={() => addProgramPlan(selectedProgramPlanId)}
                     disabled={!selectedProgramPlanId || plans.some((plan) => plan.id === selectedProgramPlanId)}
-                    className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 disabled:opacity-40 dark:active:bg-gray-700"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 active:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-700"
                   >
                     加學程
                   </button>
-                </div>
               </div>
             </div>
             <div className="space-y-2">
               {plans.map((plan) => (
-                <div key={plan.id} className="grid grid-cols-[90px_minmax(0,1fr)_90px_36px] gap-2 items-center">
+                <div key={plan.id} className="grid gap-2 rounded-lg border border-gray-100 p-2 dark:border-gray-700 sm:grid-cols-[90px_minmax(0,1fr)_90px_36px] sm:items-center">
                   <span className="text-xs text-gray-500 dark:text-gray-400">{planTypeLabels[plan.type]}</span>
                   <input
                     value={plan.name}
@@ -1395,7 +821,7 @@ export function CreditCalculator() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center gap-2 mb-3">
               <ClipboardPaste size={18} className="text-blue-600 dark:text-blue-400" />
               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">貼上課程資料</p>
@@ -1406,13 +832,13 @@ export function CreditCalculator() {
               placeholder="請複製 學生歷年成績查詢 的內容"
               className="min-h-28 w-full resize-y px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm transition-colors"
             />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                貼上課程學期
+            <div className="mt-3 grid gap-3 sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:items-center">
+              <label className="grid gap-1 text-sm text-gray-700 dark:text-gray-300 sm:inline-flex sm:items-center sm:gap-2">
+                <span>貼上課程學期</span>
                 <select
                   value={pasteSemester}
                   onChange={(event) => setPasteSemester(event.target.value)}
-                  className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                  className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
                   {semesterOptions.map((semester) => (
                     <option key={semester} value={semester}>{semester}</option>
@@ -1421,225 +847,30 @@ export function CreditCalculator() {
               </label>
               <button
                 onClick={importPaste}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600"
               >
                 <ClipboardPaste size={16} />
                 匯入貼上的課程
               </button>
-              {pasteMessage && <p className="text-sm text-gray-600 dark:text-gray-400">{pasteMessage}</p>}
+              {pasteMessage && <p className="min-w-0 text-sm text-gray-600 dark:text-gray-400">{pasteMessage}</p>}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-colors">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">課程清單</p>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  onClick={exportCoursesAsPlainText}
-                  disabled={courses.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 disabled:opacity-40 dark:active:bg-gray-700"
-                >
-                  <Download size={16} />
-                  匯出文字
-                </button>
-                <button
-                  onClick={addCourse}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700"
-                >
-                  <Plus size={16} />
-                  新增
-                </button>
-              </div>
-            </div>
-
-            {courses.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-6 text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400">尚未輸入課程。可以貼上資料，或手動新增課程。</p>
-              </div>
-            ) : (
-              <div className="max-w-full overflow-x-auto">
-                <table className="w-full min-w-[1380px] text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-500 dark:text-gray-400">
-                      <th className="py-2 pr-2">選課號碼</th>
-                      <th className="py-2 pr-2">學期</th>
-                      <th className="py-2 pr-2">課程別</th>
-                      <th className="py-2 pr-2">課程名稱</th>
-                      <th className="py-2 pr-2">學分</th>
-                      <th className="py-2 pr-2">分數</th>
-                      <th className="py-2 pr-2">成績</th>
-                      <th className="py-2 pr-2">分類</th>
-                      <th className="py-2 pr-2">開課系所</th>
-                      <th className="py-2 pr-2">EMI</th>
-                      <th className="py-2 pr-2">通識本系教師</th>
-                      <th className="py-2 pr-2">採計</th>
-                      <th className="py-2 pr-2">備註</th>
-                      <th className="py-2 text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chronologicalCourseRows.map(({ course, index }) => {
-                      const creditStatus = getCourseCreditStatus(course);
-                      return (
-                      <tr
-                        key={index}
-                        className={`border-t ${
-                          creditStatus.isUncounted
-                            ? "border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30"
-                            : "border-gray-100 dark:border-gray-700"
-                        }`}
-                      >
-                        <td className="py-2 pr-2">
-                          <input
-                            value={course.courseNo}
-                            onChange={(event) => updateCourse(index, "courseNo", event.target.value)}
-                            placeholder="0313"
-                            className="w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <select
-                            value={course.semester}
-                            onChange={(event) => updateCourse(index, "semester", event.target.value)}
-                            className="w-24 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          >
-                            <option value="">未選</option>
-                            {semesterOptions.map((semester) => (
-                              <option key={semester} value={semester}>{semester}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 pr-2">
-                          <select
-                            value={course.type}
-                            onChange={(event) => updateCourse(index, "type", event.target.value)}
-                            className="w-28 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          >
-                            <option value="">未分類</option>
-                            {Object.entries(typeLabels).map(([type, label]) => (
-                              <option key={type} value={type}>
-                                {type} / {label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            value={course.name}
-                            onChange={(event) => updateCourse(index, "name", event.target.value)}
-                            placeholder="課程名稱"
-                            className="w-full min-w-56 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max="6"
-                            step="0.5"
-                            value={course.credits || ""}
-                            onChange={(event) => updateCourse(index, "credits", event.target.value)}
-                            className="w-20 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            value={getScoreDisplay(course)}
-                            onChange={(event) => updateCourse(index, "score", event.target.value)}
-                            placeholder="90"
-                            readOnly={isUncountedOutcomeCourse(course)}
-                            className={`w-44 rounded-md border px-2 py-1.5 ${
-                              isUncountedOutcomeCourse(course)
-                                ? "border-red-300 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
-                                : "border-gray-300 bg-white text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                            }`}
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            value={course.grade}
-                            onChange={(event) => updateCourse(index, "grade", event.target.value)}
-                            placeholder="A"
-                            className="w-20 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <select
-                            value={course.category || inferCategory(course.name, requirementProfile, course.offeredBy)}
-                            onChange={(event) => updateCourse(index, "category", event.target.value)}
-                            className="w-36 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          >
-                            {categoryOptions.map((category) => (
-                              <option key={category} value={category}>
-                                {category}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            value={course.offeredBy}
-                            onChange={(event) => updateCourse(index, "offeredBy", event.target.value)}
-                            placeholder="通識中心"
-                            className="w-32 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={course.emi}
-                            onChange={(event) => updateCourse(index, "emi", event.target.checked ? "true" : "")}
-                            className="h-4 w-4"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={course.genEdProfessorFromMajorDepartment}
-                            disabled={!isGeneralEducationCourse(course, requirementProfile)}
-                            onChange={(event) => updateCourse(index, "genEdProfessorFromMajorDepartment", event.target.checked ? "true" : "")}
-                            title="通識課程若由主修系所教師開課，請勾選；未勾選時預設不是本系教師。"
-                            className="h-4 w-4 disabled:opacity-30"
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <select
-                            value={course.planId || defaultPlanId}
-                            onChange={(event) => updateCourse(index, "planId", event.target.value)}
-                            className="w-36 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-gray-900 dark:text-white"
-                          >
-                            {plans.map((plan) => (
-                              <option key={plan.id} value={plan.id}>
-                                {plan.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 pr-2">
-                          <span className={`block max-w-64 text-xs ${creditStatus.isUncounted ? "text-red-700 dark:text-red-300" : "text-gray-500 dark:text-gray-400"}`}>
-                            {creditStatus.note}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right">
-                          <button
-                            onClick={() => removeCourse(index)}
-                            aria-label="刪除課程"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <CourseTable
+            addCourse={addCourse}
+            chronologicalCourseRows={chronologicalCourseRows}
+            courses={courses}
+            exportCoursesAsPlainText={exportCoursesAsPlainText}
+            getCourseCreditStatus={getCourseCreditStatus}
+            plans={plans}
+            removeCourse={removeCourse}
+            requirementProfile={requirementProfile}
+            semesterOptions={semesterOptions}
+            updateCourse={updateCourse}
+          />
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <div
             className={`rounded-2xl bg-gradient-to-br p-6 text-white shadow-lg ${
               primaryStatusIncomplete
@@ -1692,12 +923,12 @@ export function CreditCalculator() {
                 {plan.id === digitalHumanitiesProgramId && (
                   <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                     <p>非原主修/雙主修必修：{plan.nonRequiredCredits} / 6 學分</p>
-                    {plan.unrecognizedCourses.length > 0 && (
-                      <p className="text-red-600 dark:text-red-400">
-                        {plan.unrecognizedCourses.length} 門課未列入學程採計或為抵免課程
-                      </p>
-                    )}
                   </div>
+                )}
+                {getProgramCourseRules(plan.id).length > 0 && plan.unrecognizedCourses.length > 0 && (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                    {plan.unrecognizedCourses.length} 門課未列入學程採計或為抵免課程
+                  </p>
                 )}
                 {selectedPlanDetail === plan.id && (
                   <div className="mt-3 space-y-2">
@@ -1708,7 +939,11 @@ export function CreditCalculator() {
                       plan.countedCourses.map((course, index) => {
                         const isNonRequiredProgramCourse =
                           plan.id === digitalHumanitiesProgramId &&
-                          !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus);
+                          !isDfllRequiredCourseForProgramRule(course, admissionYear, studentStatus, fallbackRequirementProfile, {
+                            compactCourseText,
+                            getCourseCategory,
+                            matchesAnyName,
+                          });
                         return (
                           <div
                             key={`${course.courseNo}-${course.name}-${course.semester}-${index}`}
@@ -1738,6 +973,16 @@ export function CreditCalculator() {
                     <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
                       {plan.notes.map((note) => (
                         <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {plan.manualChecks && plan.manualChecks.length > 0 && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs font-medium text-gray-600 dark:text-gray-300">需人工核對</summary>
+                    <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                      {plan.manualChecks.map((check) => (
+                        <li key={check}>{check}</li>
                       ))}
                     </ul>
                   </details>
@@ -1800,6 +1045,373 @@ export function CreditCalculator() {
               <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{requirement.description}</p>
             </div>
           ))}
+
+          {mechanicalGeneralEducationRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">機械系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">通識課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${mechanicalGeneralEducationRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {mechanicalGeneralEducationRequirement.completed} / {mechanicalGeneralEducationRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${mechanicalGeneralEducationRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-3">
+                {mechanicalGeneralEducationRequirement.subRequirements.map((requirement) => {
+                  const done = requirement.done === undefined ? requirement.completed >= requirement.required : requirement.done;
+                  return (
+                    <div key={requirement.id}>
+                      <div className="mb-1 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{requirement.label}</p>
+                          {requirement.detail && <p className="text-xs text-gray-500 dark:text-gray-400">{requirement.detail}</p>}
+                        </div>
+                        <span className={`shrink-0 text-xs font-medium ${done ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                          {requirement.completed} / {requirement.required}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                        <div
+                          className="h-1.5 rounded-full bg-green-600 dark:bg-green-400"
+                          style={{ width: `${Math.min((requirement.completed / requirement.required) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {mechanicalCoreRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">機械系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">核心素養課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${mechanicalCoreRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {mechanicalCoreRequirement.completed} / {mechanicalCoreRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${mechanicalCoreRequirement.progress}%` }} />
+              </div>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                「資訊素養：程式設計與AI應用」免修；若修習，不採計為通識畢業學分。
+              </p>
+              {mechanicalCoreRequirement.courses.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {mechanicalCoreRequirement.courses.map((course, index) => (
+                    <div
+                      key={`${course.courseNo}-${course.name}-${course.semester}-${index}`}
+                      className="rounded-md border border-gray-100 p-3 text-sm dark:border-gray-700"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-gray-900 dark:text-white">{course.name || "未命名課程"}</p>
+                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{countableCredits(course, requirementProfile)} 學分</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {course.semester || "未選學期"}{course.offeredBy ? ` / ${course.offeredBy}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mechanicalRequiredProfessionalRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">機械系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">系專業必修課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${mechanicalRequiredProfessionalRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {mechanicalRequiredProfessionalRequirement.completed} / {mechanicalRequiredProfessionalRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${mechanicalRequiredProfessionalRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-2">
+                {mechanicalRequiredProfessionalRequirement.courseRequirements.map((requirement) => (
+                  <div key={requirement.name}>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{requirement.name}</span>
+                      <span className={`text-xs font-medium ${requirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                        {requirement.completed} / {requirement.requiredCredits}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className="h-1.5 rounded-full bg-green-600 dark:bg-green-400"
+                        style={{ width: `${Math.min((requirement.completed / requirement.requiredCredits) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {mechanicalProfessionalElectiveRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">機械系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">系專業選修課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${mechanicalProfessionalElectiveRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {mechanicalProfessionalElectiveRequirement.completed} / {mechanicalProfessionalElectiveRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${mechanicalProfessionalElectiveRequirement.progress}%` }} />
+              </div>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                目前採計主修方案中由機械系開課、分類為專業課程，且不在74學分系專業必修清單內的課程。
+              </p>
+              <div className="mt-3 space-y-3">
+                {mechanicalProfessionalElectiveRequirement.subRequirements.map((requirement) => (
+                  <div key={requirement.id}>
+                    <div className="mb-1 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{requirement.label}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{requirement.description}</p>
+                      </div>
+                      <span className={`shrink-0 text-xs font-medium ${requirement.completed >= requirement.required ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                        {requirement.completed} / {requirement.required}
+                        {requirement.requiredCourseCount !== undefined && `，${requirement.courseCount ?? 0} / ${requirement.requiredCourseCount} 門`}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className="h-1.5 rounded-full bg-green-600 dark:bg-green-400"
+                        style={{ width: `${Math.min((requirement.completed / requirement.required) * 100, 100)}%` }}
+                      />
+                    </div>
+                    {requirement.groupRequirements && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {requirement.groupRequirements.map((group) => (
+                          <div key={group.id} className="rounded-md bg-gray-50 px-2 py-1.5 text-xs dark:bg-gray-900/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-600 dark:text-gray-400">{group.label}</span>
+                              <span className={group.completed >= group.required ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}>
+                                {group.completed} / {group.required}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {mechanicalProfessionalElectiveRequirement.courses.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {mechanicalProfessionalElectiveRequirement.courses.map((course, index) => (
+                    <div
+                      key={`${course.courseNo}-${course.name}-${course.semester}-${index}`}
+                      className="rounded-md border border-gray-100 p-3 text-sm dark:border-gray-700"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-gray-900 dark:text-white">{course.name || "未命名課程"}</p>
+                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{countableCredits(course, requirementProfile)} 學分</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {course.semester || "未選學期"}{course.offeredBy ? ` / ${course.offeredBy}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mechanicalAdditionalCollegeRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">機械系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">其餘9學分</p>
+                </div>
+                <p className={`text-sm font-semibold ${mechanicalAdditionalCollegeRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {mechanicalAdditionalCollegeRequirement.completed} / {mechanicalAdditionalCollegeRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${mechanicalAdditionalCollegeRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                <p>限理學院、工學院（含本系）、電資學院修習。</p>
+                <p>B 基礎選修超修：{mechanicalAdditionalCollegeRequirement.basicOverageCredits} 學分</p>
+                <p>C 專業選修學群超修：{mechanicalAdditionalCollegeRequirement.groupedOverageCredits} 學分</p>
+                <p>一般/其他符合學院限制課程：{mechanicalAdditionalCollegeRequirement.generalCredits} 學分</p>
+              </div>
+              {mechanicalAdditionalCollegeRequirement.generalCourses.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {mechanicalAdditionalCollegeRequirement.generalCourses.map((course, index) => (
+                    <div
+                      key={`${course.courseNo}-${course.name}-${course.semester}-${index}`}
+                      className="rounded-md border border-gray-100 p-3 text-sm dark:border-gray-700"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-gray-900 dark:text-white">{course.name || "未命名課程"}</p>
+                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{countableCredits(course, requirementProfile)} 學分</span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {course.semester || "未選學期"}{course.offeredBy ? ` / ${course.offeredBy}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {plantPathologyGeneralEducationRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">植物病理學系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">通識課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${plantPathologyGeneralEducationRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {plantPathologyGeneralEducationRequirement.completed} / {plantPathologyGeneralEducationRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${plantPathologyGeneralEducationRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-3">
+                {plantPathologyGeneralEducationRequirement.subRequirements.map((requirement) => {
+                  const done = requirement.done === undefined ? requirement.completed >= requirement.required : requirement.done;
+                  return (
+                    <div key={requirement.id}>
+                      <div className="mb-1 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{requirement.label}</p>
+                          {requirement.detail && <p className="text-xs text-gray-500 dark:text-gray-400">{requirement.detail}</p>}
+                        </div>
+                        <span className={`shrink-0 text-xs font-medium ${done ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                          {requirement.completed} / {requirement.required}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                        <div
+                          className="h-1.5 rounded-full bg-green-600 dark:bg-green-400"
+                          style={{ width: `${requirement.required === 0 ? 100 : Math.min((requirement.completed / requirement.required) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                國防教育、生命科學學群通識至多各採計1門；超修通識不採計為外系學分。
+              </p>
+            </div>
+          )}
+
+          {plantPathologyRequiredProfessionalRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">植物病理學系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">系專業必修課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${plantPathologyRequiredProfessionalRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {plantPathologyRequiredProfessionalRequirement.completed} / {plantPathologyRequiredProfessionalRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${plantPathologyRequiredProfessionalRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-2">
+                {plantPathologyRequiredProfessionalRequirement.fixedRequirements.map((requirement) => (
+                  <div key={requirement.name}>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{requirement.name}</span>
+                      <span className={`text-xs font-medium ${requirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                        {requirement.completed} / {requirement.requiredCredits}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className="h-1.5 rounded-full bg-green-600 dark:bg-green-400"
+                        style={{ width: `${Math.min((requirement.completed / requirement.requiredCredits) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {plantPathologyRequiredProfessionalRequirement.choiceRequirements.map((requirement) => (
+                  <div key={requirement.id}>
+                    <div className="mb-1 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{requirement.label}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">必修 {requirement.requiredCourseCount} 科</p>
+                      </div>
+                      <span className={`shrink-0 text-xs font-medium ${requirement.completedCourseCount >= requirement.requiredCourseCount ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                        {requirement.completed} 學分，{requirement.completedCourseCount} / {requirement.requiredCourseCount} 科
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 text-xs text-gray-500 dark:text-gray-400">
+                      {requirement.options.map((option) => (
+                        <span key={option.name}>{option.name}: {option.completed} / {option.requiredCredits}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {plantPathologyProfessionalElectiveRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">植物病理學系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">系專業選修課程</p>
+                </div>
+                <p className={`text-sm font-semibold ${plantPathologyProfessionalElectiveRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {plantPathologyProfessionalElectiveRequirement.completed} / {plantPathologyProfessionalElectiveRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${plantPathologyProfessionalElectiveRequirement.progress}%` }} />
+              </div>
+              <div className="mt-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                <p>本系專業選修：{plantPathologyProfessionalElectiveRequirement.homeCredits} 學分</p>
+                <p>外系專業選修採計：{plantPathologyProfessionalElectiveRequirement.acceptedExternalCredits} / 20 學分</p>
+                {plantPathologyProfessionalElectiveRequirement.externalOverLimit > 0 && (
+                  <p className="text-red-600 dark:text-red-300">外系學分超出 {plantPathologyProfessionalElectiveRequirement.externalOverLimit} 學分未採計。</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {plantPathologyOtherGraduationRequirement && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">植物病理學系114學年度</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">其餘畢業學分</p>
+                </div>
+                <p className={`text-sm font-semibold ${plantPathologyOtherGraduationRequirement.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {plantPathologyOtherGraduationRequirement.completed} / {plantPathologyOtherGraduationRequirement.required} 學分
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="h-2 rounded-full bg-green-600 dark:bg-green-400" style={{ width: `${plantPathologyOtherGraduationRequirement.progress}%` }} />
+              </div>
+            </div>
+          )}
 
           {dfllRequirementAudits && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
