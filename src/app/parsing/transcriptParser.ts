@@ -375,6 +375,94 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
   return courses;
 };
 
+const normalizeNchuCategory = (category: string, name: string) => {
+  if (category === "全校可選修") return "其他";
+  if (category === "外國語文" || category === "全校英外語") return "語言素養課程";
+  if (/大學國文|敘事表達/.test(category) || /大學國文|敘事表達/.test(name)) return "共同必修/通識";
+  return category;
+};
+
+const parseNchuMobileCompactTranscript = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizePasteText(line))
+    .filter(Boolean);
+  const courses: TranscriptCourse[] = [];
+  const startPattern = /^([A-Z]?\d{4,6}|抵)\s+(.+)$/;
+  const scorePattern = /^(Req(?:uired)?|Elec(?:tive)?|Gen|P\.?E\.?|Service)?\s*([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s+([YN-])(?:\s+.*)?$/i;
+  const typePattern = /(必修|選修|通識|體育|服務|Required|Elective|Gen|P\.?E\.?|Service)/i;
+  const typeMap: Record<string, string> = {
+    必修: "必",
+    required: "必",
+    選修: "選",
+    elective: "選",
+    elec: "選",
+    通識: "通",
+    gen: "通",
+    體育: "體",
+    "p.e.": "體",
+    pe: "體",
+    服務: "服",
+    service: "服",
+  };
+  const toCourseType = (value: string) => typeMap[value.toLowerCase()] ?? typeMap[value] ?? "";
+  const categoryLabels = [
+    "人文領域",
+    "社會科學領域",
+    "自然科學領域",
+    "統合領域",
+    "核心素養",
+    "資訊素養",
+    "外國語文",
+    "全校英外語",
+    "敘事表達/大學國文",
+    "體育",
+  ];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const startMatch = lines[index].match(startPattern);
+    if (!startMatch) continue;
+
+    const block: string[] = [];
+    let cursor = index + 1;
+    while (cursor < lines.length && !lines[cursor].match(startPattern)) {
+      block.push(lines[cursor]);
+      cursor += 1;
+    }
+
+    const scoreLine = block.find((line) => scorePattern.test(line));
+    const scoreMatch = scoreLine?.match(scorePattern);
+    if (!scoreMatch) {
+      index = cursor - 1;
+      continue;
+    }
+
+    const name = startMatch[2].trim();
+    const categorySource = block.slice(0, block.indexOf(scoreLine ?? "")).join(" ");
+    const rawCategory = categoryLabels.find((label) => categorySource.includes(label)) ?? "";
+    const offeredBy =
+      categorySource.match(/([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))(?:\s|$)/)?.[1] ?? "";
+    const typeSource = [...block].reverse().find((line) => typePattern.test(line)) ?? "";
+    const matchedType = scoreMatch[1] || typeSource.match(typePattern)?.[1] || "";
+
+    courses.push(withCourseDefaults({
+      courseNo: startMatch[1] === "抵" ? "" : startMatch[1],
+      type: toCourseType(matchedType),
+      name,
+      credits: Number(scoreMatch[2]),
+      score: scoreMatch[4] === "-" ? scoreMatch[3] : scoreMatch[4],
+      grade: normalizeGrade(scoreMatch[5]),
+      category: normalizeNchuCategory(rawCategory, name),
+      offeredBy,
+      emi: scoreMatch[6]?.toUpperCase() === "Y",
+    }, profile));
+
+    index = cursor - 1;
+  }
+
+  return courses;
+};
+
 const getParsedCourseKey = (course: TranscriptCourse) =>
   [
     course.courseNo && course.courseNo !== "抵" ? course.courseNo : "",
@@ -388,8 +476,9 @@ export const parsePastedCourses = (text: string, profile: RequirementProfile): T
   const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
   const mobileLabelValueCourses = parseNchuMobileLabelValueTranscript(text, profile);
   const mobileWrappedTableCourses = parseNchuMobileWrappedTableTranscript(text, profile);
+  const mobileCompactCourses = parseNchuMobileCompactTranscript(text, profile);
   const seen = new Set<string>();
-  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses].filter((course) => {
+  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses, ...mobileCompactCourses].filter((course) => {
     const key = getParsedCourseKey(course);
     if (seen.has(key)) return false;
     seen.add(key);

@@ -98,7 +98,58 @@ Language Center	3
   assert.equal(wrappedCourses[1].courseNo, "0456");
   assert.equal(wrappedCourses[1].category, "社會科學領域");
 
-  console.log("transcript parser tests passed: 21");
+  const compactMobilePaste = `
+0016 籃球4C
+Basketball 體育
+Physical Education 體育室
+Office of Physical Education and Sports 必修
+Required 1 94 94 A+ N 查看級距
+0503 半導體通識講座：與我們息息相關的半導體
+Semiconductor in Our Life 自然科學領域
+Natural Science Category 通識中心
+General Education Center 必修
+Required 2 - 81 A- N 查看級距
+0924 英語溝通與表達
+English Communication and Expression 外國語文
+Foreign Languages 語言中心
+Language Center 必修
+Required 2 92 92 A+ N 查看級距
+1169 普通化學
+General Chemistry -
+化學系
+Department of Chemistry 必修
+Required 3 78 78 B+ N 查看級距
+9996 英文能力檢定及輔導
+English Proficiency Requirement 全校英外語
+English Language Courses 語言中心
+Language Center 必修
+Required 0 - I - N 查看級距
+9999 操行
+Conduct Mark -
+學務處
+Office of Student Affairs 必修
+Required 0 - 85 A N -
+`;
+
+  const compactCourses = parsePastedCourses(compactMobilePaste, profile);
+  assert.equal(compactCourses.length, 6);
+  assert.equal(compactCourses[0].courseNo, "0016");
+  assert.equal(compactCourses[0].name, "籃球4C");
+  assert.equal(compactCourses[0].type, "必");
+  assert.equal(compactCourses[0].category, "體育");
+  assert.equal(compactCourses[0].offeredBy, "體育室");
+  assert.equal(compactCourses[0].credits, 1);
+  assert.equal(compactCourses[0].score, "94");
+  assert.equal(compactCourses[0].grade, "A+");
+  assert.equal(compactCourses[1].category, "自然科學領域");
+  assert.equal(compactCourses[1].score, "81");
+  assert.equal(compactCourses[2].category, "語言素養課程");
+  assert.equal(compactCourses[3].offeredBy, "化學系");
+  assert.equal(compactCourses[4].credits, 0);
+  assert.equal(compactCourses[4].grade, "-");
+  assert.equal(compactCourses[5].name, "操行");
+
+  console.log("transcript parser tests passed: 36");
 } finally {
   await server.close();
 }
