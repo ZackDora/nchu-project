@@ -42,7 +42,6 @@ type ExternalResource = {
   title: string;
   description: string;
   url: string;
-  sourceType?: "live-course" | "search-link";
 };
 
 type ChatMessage = {
@@ -458,7 +457,7 @@ const renderExternalResourceCards = (resources: ExternalResource[]) => {
             </div>
             <p className="text-xs leading-5 text-gray-600 dark:text-gray-300">{resource.description}</p>
             <p className="mt-2 text-[11px] font-medium text-violet-700 dark:text-violet-300">
-              {resource.sourceType === "search-link" ? "Search manually" : "Live result"}
+              Live course result
             </p>
           </a>
         ))}
@@ -489,91 +488,14 @@ const getSearchTerms = (topic: string) => {
   return getLearningSearchTerms(topic).slice(0, MAX_SEARCH_TERMS);
 };
 
-const buildExternalResources = (topic: string): ExternalResource[] => {
-  const encodedTopic = encodeURIComponent(topic);
-  const normalizedTopic = topic.toLowerCase();
-
-  const resources: ExternalResource[] = [
-    {
-      provider: "Coursera",
-      title: `${topic} 線上課程`,
-      description: "適合找結構化課程、作業與證書型學習路線。",
-      url: `https://www.coursera.org/search?query=${encodedTopic}`,
-      sourceType: "search-link",
-    },
-    {
-      provider: "edX",
-      title: `${topic} 大學與機構課程`,
-      description: "適合找大學、企業與國際機構提供的入門或進階課程。",
-      url: `https://www.edx.org/search?q=${encodedTopic}`,
-      sourceType: "search-link",
-    },
-    {
-      provider: "YouTube",
-      title: `${topic} 教學影片`,
-      description: "適合先看示範、快速建立概念，再決定要不要深入。",
-      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${topic} 入門 教學`)}`,
-      sourceType: "search-link",
-    },
-  ];
-
-  if (/python|程式|programming|coding|資料|data|ai|人工智慧/i.test(normalizedTopic)) {
-    resources.splice(2, 0,
-      {
-        provider: "freeCodeCamp",
-        title: `${topic} 免費實作課程`,
-        description: "適合用專案和練習題建立寫程式的手感。",
-        url: `https://www.freecodecamp.org/search?query=${encodedTopic}`,
-        sourceType: "search-link",
-      },
-      {
-        provider: "Kaggle Learn",
-        title: "Python / Data 入門練習",
-        description: "適合 Python、資料分析與機器學習的短課程練習。",
-        url: "https://www.kaggle.com/learn",
-        sourceType: "search-link",
-      },
-    );
-  } else if (/鋼琴|音樂|樂器|吉他|演奏|piano|music/i.test(normalizedTopic)) {
-    resources.splice(2, 0,
-      {
-        provider: "OpenLearn",
-        title: `${topic} 免費開放課程`,
-        description: "適合補充音樂概念、練習方法與基礎理論。",
-        url: `https://www.open.edu/openlearn/search-results?search_api_fulltext=${encodedTopic}`,
-        sourceType: "search-link",
-      },
-      {
-        provider: "Class Central",
-        title: `${topic} 課程彙整`,
-        description: "適合比較多個平台上的免費與付費課程。",
-        url: `https://www.classcentral.com/search?q=${encodedTopic}`,
-        sourceType: "search-link",
-      },
-    );
-  } else {
-    resources.push({
-      provider: "Class Central",
-      title: `${topic} 課程彙整`,
-      description: "適合一次比較 Coursera、edX 等平台上的課程。",
-      url: `https://www.classcentral.com/search?q=${encodedTopic}`,
-      sourceType: "search-link",
-    });
-  }
-
-  return resources.slice(0, MAX_EXTERNAL_RESOURCE_CARDS);
-};
-
 const fetchExternalResources = async (topic: string) => {
-  const fallbackResources = buildExternalResources(topic);
   try {
     const response = await fetchWithTimeout(`/api/nchu/external-courses?topic=${encodeURIComponent(topic)}`, {}, 14000);
-    if (!response.ok) return fallbackResources;
+    if (!response.ok) return [];
     const data = (await response.json()) as { resources?: ExternalResource[] };
-    const liveResources = (data.resources ?? []).map((resource) => ({ ...resource, sourceType: "live-course" as const }));
-    return liveResources.length > 0 ? liveResources.slice(0, MAX_EXTERNAL_RESOURCE_CARDS) : fallbackResources;
+    return (data.resources ?? []).slice(0, MAX_EXTERNAL_RESOURCE_CARDS);
   } catch {
-    return fallbackResources;
+    return [];
   }
 };
 
@@ -782,7 +704,7 @@ export function CourseAnalysis() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4.25rem)] min-h-[560px] flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-full min-h-0 flex-col bg-gray-50 dark:bg-gray-900">
       <header className="shrink-0 border-b border-gray-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -802,49 +724,49 @@ export function CourseAnalysis() {
       <main className="min-h-0 flex-1 overflow-hidden">
         <div className="mx-auto flex h-full max-w-4xl flex-col">
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6 md:py-8">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-            AI 內容可能有錯，請再次確認 NCHU 官方課程查詢、系所公告或授課教師資訊。模型：Groq，實際模型會顯示在每次回答下方；限制：非官方學務建議，免費 API 可能有額度或速率限制。
-          </div>
-          {messages.map((message, index) => (
-            <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[82%] ${
-                  message.role === "user"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "border border-gray-200 bg-white text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200"
-                }`}
-              >
-                {message.role === "assistant" ? (
-                  <>
-                    {renderMessageText(message.text)}
-                    {message.modelLabel && (
-                      <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                        AI model：{message.modelLabel}
-                      </p>
-                    )}
-                    {renderNchuLookupStatus(message.courses ?? [], message.events ?? [], message.nchuLookup)}
-                    {renderCourseCards(message.courses ?? [])}
-                    {renderEventCards(message.events ?? [])}
-                    {renderExternalResourceCards(message.externalResources ?? [])}
-                  </>
-                ) : (
-                  message.text
-                )}
-              </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+              AI 內容可能有錯，請再次確認 NCHU 官方課程查詢、系所公告或授課教師資訊。模型：Groq，實際模型會顯示在每次回答下方；限制：非官方學務建議，免費 API 可能有額度或速率限制。
             </div>
-          ))}
-          {isAiLoading && (
-            <div className="flex justify-start">
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
-                <LoaderCircle size={16} className="animate-spin" />
-                正在整理 AI 建議與 NCHU 資源...
+            {messages.map((message, index) => (
+              <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[82%] ${
+                    message.role === "user"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "border border-gray-200 bg-white text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200"
+                  }`}
+                >
+                  {message.role === "assistant" ? (
+                    <>
+                      {renderMessageText(message.text)}
+                      {message.modelLabel && (
+                        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                          AI model：{message.modelLabel}
+                        </p>
+                      )}
+                      {renderNchuLookupStatus(message.courses ?? [], message.events ?? [], message.nchuLookup)}
+                      {renderCourseCards(message.courses ?? [])}
+                      {renderEventCards(message.events ?? [])}
+                      {renderExternalResourceCards(message.externalResources ?? [])}
+                    </>
+                  ) : (
+                    message.text
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+            {isAiLoading && (
+              <div className="flex justify-start">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
+                  <LoaderCircle size={16} className="animate-spin" />
+                  正在整理 AI 建議與 NCHU 資源...
+                </div>
+              </div>
+            )}
           </div>
 
           <form
-            className="shrink-0 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6"
+            className="shrink-0 border-t border-gray-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6 sm:py-3"
             onSubmit={(event) => {
               event.preventDefault();
               void sendChatMessage();
@@ -862,7 +784,7 @@ export function CourseAnalysis() {
                 }}
                 placeholder="例如：我想學 Python，想做一個作品"
                 rows={1}
-                className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-gray-900 outline-none dark:text-white"
+                className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-base leading-6 text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500 sm:text-sm"
               />
               <button
                 type="submit"

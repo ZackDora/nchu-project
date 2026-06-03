@@ -53,6 +53,7 @@ export function CourseTable({
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
           <button
+            type="button"
             onClick={exportCoursesAsPlainText}
             disabled={courses.length === 0}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 active:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-700"
@@ -61,6 +62,7 @@ export function CourseTable({
             匯出文字
           </button>
           <button
+            type="button"
             onClick={addCourse}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 active:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-700"
           >
@@ -120,6 +122,7 @@ export function CourseTable({
                       />
                     </div>
                     <button
+                      type="button"
                       onClick={() => removeCourse(index)}
                       aria-label="刪除課程"
                       className="mt-5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"
@@ -439,6 +442,7 @@ export function CourseTable({
                     </td>
                     <td className="py-2 text-right">
                       <button
+                        type="button"
                         onClick={() => removeCourse(index)}
                         aria-label="刪除課程"
                         className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100 dark:text-gray-400 dark:active:bg-gray-700"

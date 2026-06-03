@@ -45,6 +45,7 @@ export function RootLayout() {
             </NavLink>
           </nav>
           <button
+            type="button"
             onClick={toggleTheme}
             className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center active:bg-gray-200 dark:active:bg-gray-600 transition-colors"
             aria-label="切換深色模式"

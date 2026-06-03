@@ -770,25 +770,26 @@ export function CreditCalculator() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">主修來自系所總學分；學程可依需要加入。</p>
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:items-center lg:justify-end">
-                  <select
-                    value={selectedProgramPlanId}
-                    onChange={(event) => setSelectedProgramPlanId(event.target.value)}
-                    className="min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    aria-label="選擇學程"
-                  >
-                    {optionalProgramPlans.map((program) => (
-                      <option key={program.id} value={program.id}>
-                        {program.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => addProgramPlan(selectedProgramPlanId)}
-                    disabled={!selectedProgramPlanId || plans.some((plan) => plan.id === selectedProgramPlanId)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 active:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-700"
-                  >
-                    加學程
-                  </button>
+                <select
+                  value={selectedProgramPlanId}
+                  onChange={(event) => setSelectedProgramPlanId(event.target.value)}
+                  className="min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                  aria-label="選擇學程"
+                >
+                  {optionalProgramPlans.map((program) => (
+                    <option key={program.id} value={program.id}>
+                      {program.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => addProgramPlan(selectedProgramPlanId)}
+                  disabled={!selectedProgramPlanId || plans.some((plan) => plan.id === selectedProgramPlanId)}
+                  className="min-h-10 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 active:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:active:bg-gray-700"
+                >
+                  加學程
+                </button>
               </div>
             </div>
             <div className="space-y-2">
@@ -809,6 +810,7 @@ export function CreditCalculator() {
                     className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
                   />
                   <button
+                    type="button"
                     onClick={() => removePlan(plan.id)}
                     disabled={plan.id === defaultPlanId}
                     aria-label="移除方案"
@@ -846,6 +848,7 @@ export function CreditCalculator() {
                 </select>
               </label>
               <button
+                type="button"
                 onClick={importPaste}
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600 sm:w-auto"
               >
@@ -1481,7 +1484,7 @@ export function CreditCalculator() {
           )}
 
           {requirementProfile.externalCreditLimit !== undefined && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <button
               type="button"
               onClick={() => setShowExternalCreditCourses((current) => !current)}
@@ -1562,7 +1565,7 @@ export function CreditCalculator() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {Object.entries(groupedCredits).filter(([, credits]) => credits > 0).map(([groupName, credits]) => (
               <button
                 key={groupName}
@@ -1616,6 +1619,7 @@ export function CreditCalculator() {
 
           {courses.length > 0 && (
             <button
+              type="button"
               onClick={clearTranscript}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700"
             >
