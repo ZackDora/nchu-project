@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router";
-import { Calculator, BookOpen, Moon, Sun } from "lucide-react";
+import { BookOpen, Calculator, Moon, Sun, FileText } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 export function RootLayout() {
@@ -14,7 +14,7 @@ export function RootLayout() {
               NCHU Study Assistant
             </span>
           </div>
-          <nav className="grid min-w-0 flex-1 grid-cols-2 gap-1 md:flex md:justify-center md:gap-3">
+          <nav className="grid min-w-0 flex-1 grid-cols-3 gap-1 md:flex md:justify-center md:gap-3">
             <NavLink
               to="/"
               end
@@ -42,6 +42,20 @@ export function RootLayout() {
             >
               <BookOpen size={18} />
               <span className="truncate">AI學習規劃</span>
+            </NavLink>
+
+            <NavLink
+              to="/manual"
+              className={({ isActive }) =>
+                `flex min-w-0 items-center justify-center gap-1.5 md:gap-2 px-2 py-2 rounded-lg text-xs md:text-sm transition-colors ${
+                  isActive
+                    ? "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`
+              }
+            >
+              <FileText size={18} />
+              <span className="truncate">使用說明</span>
             </NavLink>
           </nav>
           <button
