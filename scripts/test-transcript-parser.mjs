@@ -242,7 +242,84 @@ Freshman English	-
   assert.equal(headerCourses[11].credits, 2);
   assert.equal(headerCourses[11].grade, "抵");
 
-  console.log("transcript parser tests passed: 51");
+  const separatedTransferTranscript = `
+0041	體
+P.E.	游泳2C
+Swimming	體育
+Physical Education	體育室
+Office of Physical Education and Sports	1	88	A	N
+0208	通
+Gen	國際禮儀與專業形象
+International Etiquette and Professional Image	通識自由選修/統合領域
+Integrated Domains	通識中心
+General Education Center	2	88	A	N
+0558	通
+Gen	數學世界的奧秘
+The Mystery of Mathematics	自然科學領域
+Natural Science Category	通識中心
+General Education Center	2	87	A	Y
+0643	通
+Gen	探索我們的亞洲鄰居：政治、經濟、社會
+Exploring Our Asian Neighbors: Politics, Economics and Society	核心素養
+Core Competencies	通識中心
+General Education Center	2	94	A+	Y
+0644	通
+Gen	開放教育中的全球素養
+Open Education and Global Competence	核心素養
+Core Competencies	通識中心
+General Education Center	2	100	A+	Y
+1008	服
+Service	服務學習(二)：勞作教育
+Service-LearningII:Student Labor Education and Work-Study Management	服務學習
+Service Learning	學務處
+Office of Student Affairs	0	74		N
+1052	必
+Req	英文作文(一)
+English Composition (I)	-
+外文系
+Department of Foreign Languages and Literatures	2	92	A+	N
+1056	必
+Req	文學作品讀法
+Approaches to Literature	-
+外文系
+Department of Foreign Languages and Literatures	2	87	A	N
+1062	必
+Req	英語口語訓練(一)
+English Oral Training (I)	-
+外文系
+Department of Foreign Languages and Literatures	2	95	A+	N
+1066	選
+Elec	發音練習
+Pronunciation Drills	-
+外文系
+Department of Foreign Languages and Literatures	2	87	A	N
+1752	必
+Req	大學國文
+College Chinese	敘事表達/大學國文
+College Chinese	通識中心
+General Education Center	2	87	A	N
+抵	通
+Gen	大一英文
+Freshman English	-
+-
+2	抵		-
+`;
+
+  const separatedTransferCourses = parsePastedCourses(separatedTransferTranscript, profile);
+  assert.equal(separatedTransferCourses.length, 12);
+  assert.equal(separatedTransferCourses[0].courseNo, "0041");
+  assert.equal(separatedTransferCourses[0].type, "體");
+  assert.equal(separatedTransferCourses[0].category, "體育");
+  assert.equal(separatedTransferCourses[1].courseNo, "0208");
+  assert.equal(separatedTransferCourses[1].category, "統合領域");
+  assert.equal(separatedTransferCourses[5].courseNo, "1008");
+  assert.equal(separatedTransferCourses[5].category, "體育/服務學習");
+  assert.equal(separatedTransferCourses[5].credits, 0);
+  assert.equal(separatedTransferCourses[11].name, "大一英文");
+  assert.equal(separatedTransferCourses[11].credits, 2);
+  assert.equal(separatedTransferCourses[11].grade, "抵");
+
+  console.log("transcript parser tests passed: 62");
 } finally {
   await server.close();
 }

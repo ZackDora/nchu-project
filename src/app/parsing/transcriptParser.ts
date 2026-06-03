@@ -366,7 +366,7 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
   const courses: TranscriptCourse[] = [];
   const typePattern = "(必|選|通|體|服|Req|Elec|Gen|P\\.?E\\.?|Service)";
   const startPattern = new RegExp(`^([A-Z]?\\d{4,6}|抵)\\s+${typePattern}$`, "i");
-  const scorePattern = /^(.+?)\s+([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|P|抵|-)(?:\s+([A-F][+-]?|P|W|抵|-))?\s+([YN-]))?$/i;
+  const scorePattern = /^(?:(.+?)\s+)?([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|P|抵|-)(?:\s+([A-F][+-]?|P|W|抵|-))?\s+([YN-]))?$/i;
   const normalizeCourseType = (value: string) => {
     const matchedType = value.match(/必|選|通|體|服/)?.[0];
     return matchedType ?? "";
@@ -389,7 +389,11 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
     if (!name || !detailMatch) continue;
     const metadataLines = lines.slice(index + 2, detailIndex);
     const metadataText = metadataLines.join(" ");
-    const category = metadataText.match(/(?:^|\s)(人文領域|社會科學領域|自然科學領域|統合領域|核心素養|資訊素養|全校可選修|全校英外語|外國語文|敘事表達\/大學國文|專業領域微課程|體育)(?:\s|$)/)?.[1] ?? "";
+    const categoryLabels = ["敘事表達/大學國文", "人文領域", "社會科學領域", "自然科學領域", "統合領域", "核心素養", "資訊素養", "全校可選修", "全校英外語", "外國語文", "專業領域微課程", "服務學習", "體育"];
+    const rawCategory = categoryLabels.find((label) => metadataText.includes(label)) ?? "";
+    const category = rawCategory === "服務學習"
+      ? profile.nonGraduationRequirement?.category ?? "體育/服務學習"
+      : rawCategory;
     const offeredByLine = [...metadataLines].reverse().find((line) => /(?:^|\s)([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/.test(line)) ?? "";
     const offeredBy = offeredByLine.match(/(?:^|\s)([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? "";
 
@@ -411,7 +415,7 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
       score: detailMatch[3] ?? "",
       grade,
       category: category === "全校可選修" ? "其他" : category,
-      offeredBy: offeredBy || detailMatch[1],
+      offeredBy: offeredBy || detailMatch[1] || "",
       emi: detailMatch[5]?.toUpperCase() === "Y",
     }, profile));
   }
