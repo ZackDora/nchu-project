@@ -2,7 +2,6 @@ import {
   BrainCircuit,
   LoaderCircle,
   Send,
-  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { getLearningSearchTerms, hasLearningIntent, normalizeLearningTopic } from "../utils/learningTopic";
@@ -783,40 +782,37 @@ export function CourseAnalysis() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4.75rem)] min-h-[520px] flex-col px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
-          <BrainCircuit className="text-white" size={22} />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">AI 學習規劃</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">直接聊天，AI 會幫你整理方向、節奏與下一步。</p>
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-        AI 內容可能有錯，請用 NCHU 官方課程查詢、系所公告或授課教師資訊再次確認。此頁目前使用 Groq API，模型以伺服器設定為準；每次回答下方會顯示實際模型。限制：它不是官方學務建議，NCHU 資源只涵蓋已接上的課程查詢、圖書館活動與官方來源摘要，且免費 API 可能有速率或額度限制。
-      </div>
-
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-600 dark:text-blue-400" />
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">AI 學習對話</h2>
+    <div className="flex h-[calc(100dvh-4.25rem)] min-h-[560px] flex-col bg-gray-50 dark:bg-gray-900">
+      <header className="shrink-0 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
+              <BrainCircuit className="text-white" size={20} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white">AI 學習規劃</h1>
+              <p className="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">直接聊天，整理方向、路線與下一步。</p>
+            </div>
           </div>
-          <span className="rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
-            {isAiLoading ? "正在思考" : hasGenerated ? "可繼續追問" : "等待你的問題"}
+          <span className="shrink-0 rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
+            {isAiLoading ? "正在思考" : hasGenerated ? "可繼續追問" : "等待問題"}
           </span>
         </div>
+        <div className="mx-auto mt-3 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100 sm:text-sm">
+          AI 內容可能有錯，請用 NCHU 官方課程查詢、系所公告或授課教師資訊再次確認。此頁目前使用 Groq API，模型以伺服器設定為準；每次回答下方會顯示實際模型。限制：它不是官方學務建議，NCHU 資源只涵蓋已接上的課程查詢、圖書館活動與官方來源摘要，且免費 API 可能有速率或額度限制。
+        </div>
+      </header>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900/40">
+      <main className="min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto flex h-full max-w-4xl flex-col">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6 md:py-8">
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[86%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm ${
+                className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[82%] ${
                   message.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "border border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "border border-gray-200 bg-white text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200"
                 }`}
               >
                 {message.role === "assistant" ? (
@@ -840,46 +836,47 @@ export function CourseAnalysis() {
           ))}
           {isAiLoading && (
             <div className="flex justify-start">
-              <div className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
                 <LoaderCircle size={16} className="animate-spin" />
                 正在整理 AI 建議與 NCHU 資源...
               </div>
             </div>
           )}
-        </div>
-
-        <form
-          className="border-t border-gray-200 p-3 dark:border-gray-700"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void sendChatMessage();
-          }}
-        >
-          <div className="flex items-end gap-2">
-            <textarea
-              value={chatInput}
-              onChange={(event) => setChatInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendChatMessage();
-                }
-              }}
-              placeholder="例如：我想學 Python，想做一個作品"
-              rows={2}
-              className="min-h-12 flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:ring-blue-900/40"
-            />
-            <button
-              type="submit"
-              disabled={!chatInput.trim() || isAiLoading}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white transition active:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-blue-500 dark:active:bg-blue-600 dark:disabled:bg-gray-700"
-              aria-label="送出訊息"
-            >
-              {isAiLoading ? <LoaderCircle size={18} className="animate-spin" /> : <Send size={18} />}
-            </button>
           </div>
-        </form>
-      </section>
+
+          <form
+            className="shrink-0 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90 sm:px-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void sendChatMessage();
+            }}
+          >
+            <div className="flex items-end gap-2 rounded-2xl border border-gray-300 bg-white p-2 shadow-sm transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 dark:border-gray-700 dark:bg-gray-900 dark:focus-within:ring-blue-900/40">
+              <textarea
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendChatMessage();
+                  }
+                }}
+                placeholder="例如：我想學 Python，想做一個作品"
+                rows={1}
+                className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-gray-900 outline-none dark:text-white"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || isAiLoading}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition active:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-blue-500 dark:active:bg-blue-600 dark:disabled:bg-gray-700"
+                aria-label="送出訊息"
+              >
+                {isAiLoading ? <LoaderCircle size={18} className="animate-spin" /> : <Send size={18} />}
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
     </div>
   );
 }
