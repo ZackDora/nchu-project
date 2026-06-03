@@ -52,6 +52,12 @@ const manualSteps = [
     icon: MousePointerClick,
     title: "在本網站選擇正確學期",
     description: "回到學分計算頁，在「貼上課程學期」選擇你準備匯入的正確學期。",
+    images: [
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-5.png`,
+        alt: "在學分計算頁選擇貼上課程學期",
+      },
+    ],
   },
   {
     icon: PencilLine,
