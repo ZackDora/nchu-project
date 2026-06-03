@@ -326,6 +326,55 @@ const parseNchuMobileLabelValueTranscript = (text: string, profile: RequirementP
   return courses;
 };
 
+const parseNchuMobileWrappedTableTranscript = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizePasteText(line))
+    .filter(Boolean);
+  const courses: TranscriptCourse[] = [];
+  const typePattern = "(必|選|通|體|服|Req|Elec|Gen|P\\.?E\\.?|Service)";
+  const startPattern = new RegExp(`^([A-Z]?\\d{4,6}|抵)\\s+${typePattern}$`, "i");
+  const scorePattern = /^(.+?)\s+([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s*([YN-])?)?$/i;
+  const normalizeCourseType = (value: string) => {
+    const matchedType = value.match(/必|選|通|體|服/)?.[0];
+    return matchedType ?? "";
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const startMatch = lines[index].match(startPattern);
+    if (!startMatch) continue;
+
+    const type = normalizeCourseType(startMatch[2] ?? "");
+    const nameLine = lines[index + 1] ?? "";
+    const categoryLine = lines[index + 2] ?? "";
+    const offeredByLine = lines[index + 3] ?? "";
+    const detailLine = lines[index + 4] ?? "";
+    const name = nameLine.replace(/^(Req|Elec|Gen|P\.?E\.?|Service)\s+/i, "").trim();
+    const category = categoryLine.match(/\s(人文領域|社會科學領域|自然科學領域|統合領域|核心素養|資訊素養|全校可選修|專業領域微課程|體育)$/)?.[1] ?? "";
+    const offeredBy = offeredByLine.match(/\s([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? "";
+    const detailMatch = detailLine.match(scorePattern);
+    if (!name || !detailMatch) continue;
+
+    const credits = Number(detailMatch[2]);
+    const grade = detailMatch[4] ? normalizeGrade(detailMatch[4]) : "";
+    if (!credits || !grade) continue;
+
+    courses.push(withCourseDefaults({
+      courseNo: startMatch[1] === "抵" ? "" : startMatch[1],
+      type,
+      name,
+      credits,
+      score: detailMatch[3] ?? "",
+      grade,
+      category: category === "全校可選修" ? "其他" : category,
+      offeredBy: offeredBy || detailMatch[1],
+      emi: detailMatch[5]?.toUpperCase() === "Y",
+    }, profile));
+  }
+
+  return courses;
+};
+
 const getParsedCourseKey = (course: TranscriptCourse) =>
   [
     course.courseNo && course.courseNo !== "抵" ? course.courseNo : "",
@@ -338,8 +387,9 @@ export const parsePastedCourses = (text: string, profile: RequirementProfile): T
   const structuredCourses = parseStructuredRows(text, profile);
   const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
   const mobileLabelValueCourses = parseNchuMobileLabelValueTranscript(text, profile);
+  const mobileWrappedTableCourses = parseNchuMobileWrappedTableTranscript(text, profile);
   const seen = new Set<string>();
-  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses].filter((course) => {
+  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses].filter((course) => {
     const key = getParsedCourseKey(course);
     if (seen.has(key)) return false;
     seen.add(key);

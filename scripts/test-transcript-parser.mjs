@@ -66,7 +66,39 @@ N
   const simplePaste = "鋼琴演奏入門,2,A";
   assert.equal(parsePastedCourses(simplePaste, profile).length, 1);
 
-  console.log("transcript parser tests passed: 10");
+  const mobileWrappedTablePaste = `
+0313	通
+Gen	語言、文化與溝通
+Language, Culture and Communication	人文領域
+Humanistic Category	通識中心
+General Education Center	2	90	A+	Y
+0456	通
+Gen	數位媒體與第二外語習得
+Digital Media and Second Language Acquisition	社會科學領域
+Social Science Category	通識中心
+General Education Center	2	95	A+	Y
+0959	選
+Elec	實用華語(二)
+Practical Chinese(II)	全校可選修
+Other Elective Course	語言中心
+Language Center	3
+`;
+
+  const wrappedCourses = parsePastedCourses(mobileWrappedTablePaste, profile);
+  assert.equal(wrappedCourses.length, 2);
+  assert.equal(wrappedCourses[0].courseNo, "0313");
+  assert.equal(wrappedCourses[0].type, "通");
+  assert.equal(wrappedCourses[0].name, "語言、文化與溝通");
+  assert.equal(wrappedCourses[0].category, "人文領域");
+  assert.equal(wrappedCourses[0].offeredBy, "通識中心");
+  assert.equal(wrappedCourses[0].credits, 2);
+  assert.equal(wrappedCourses[0].score, "90");
+  assert.equal(wrappedCourses[0].grade, "A+");
+  assert.equal(wrappedCourses[0].emi, true);
+  assert.equal(wrappedCourses[1].courseNo, "0456");
+  assert.equal(wrappedCourses[1].category, "社會科學領域");
+
+  console.log("transcript parser tests passed: 21");
 } finally {
   await server.close();
 }
