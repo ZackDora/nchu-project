@@ -642,11 +642,14 @@ export function CourseAnalysis() {
         "不要輸出生硬的系統推定欄位。",
       ].join("\n");
 
-      const [sources, courseResponses, allEvents] = await Promise.all([
-        shouldUseNchuResources ? fetchOfficialSources(question) : Promise.resolve([] as NchuSource[]),
-        Promise.all(searchTerms.map((term) => fetchCourses(term))),
-        fetchEvents(),
+      const [sources, courseResults, allEvents] = await Promise.all([
+        shouldUseNchuResources ? fetchOfficialSources(question).catch(() => [] as NchuSource[]) : Promise.resolve([] as NchuSource[]),
+        Promise.allSettled(searchTerms.map((term) => fetchCourses(term))),
+        fetchEvents().catch(() => [] as NchuEvent[]),
       ]);
+      const courseResponses = courseResults
+        .filter((result): result is PromiseFulfilledResult<{ term: string; courses: NchuCourse[] }> => result.status === "fulfilled")
+        .map((result) => result.value);
 
       const courseMap = new Map<string, NchuCourse>();
       for (const response of courseResponses) {
