@@ -197,8 +197,152 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
   return courses;
 };
 
+type MobileCourseDraft = Partial<TranscriptCourse> & {
+  credits?: number;
+  grade?: string;
+  name?: string;
+};
+
+const mobileFieldLabels: Record<string, keyof MobileCourseDraft> = {
+  選課號碼: "courseNo",
+  課程號碼: "courseNo",
+  號碼: "courseNo",
+  courseno: "courseNo",
+  coursenumber: "courseNo",
+  課程別: "type",
+  category: "type",
+  科目名稱: "name",
+  課程名稱: "name",
+  coursename: "name",
+  課程分類: "category",
+  classify: "category",
+  開課系所: "offeredBy",
+  offereddept: "offeredBy",
+  offereddepartment: "offeredBy",
+  學分: "credits",
+  credits: "credits",
+  成績: "score",
+  score: "score",
+  等第: "grade",
+  grade: "grade",
+  emi: "emi",
+};
+
+const compactMobileLabel = (value: string) => value.replace(/[.\s:：/]/g, "").toLowerCase();
+
+const getMobileFieldLabel = (line: string, nextLine = "") => {
+  const compactLine = compactMobileLabel(line);
+  const compactPair = compactMobileLabel(`${line}${nextLine}`);
+  return {
+    field: mobileFieldLabels[compactLine] ?? mobileFieldLabels[compactPair],
+    consumedLines: mobileFieldLabels[compactLine] ? 1 : mobileFieldLabels[compactPair] ? 2 : 0,
+  };
+};
+
+const isValidMobileCourseDraft = (course: MobileCourseDraft): course is MobileCourseDraft & Pick<TranscriptCourse, "name" | "credits" | "grade"> =>
+  Boolean(course.name && typeof course.credits === "number" && course.credits > 0 && course.grade);
+
+const normalizeMobileCourseValue = (field: keyof MobileCourseDraft, value: string) => {
+  if (field === "type") {
+    const matchedType = value.match(/必|選|通|體|服|Req|Elec|Gen|P\.?E\.?|Service/i)?.[0] ?? value;
+    return matchedType in typeLabels ? matchedType : value;
+  }
+  if (field === "credits") return Number(value.match(/[0-6](?:\.[05])?/)?.[0] ?? value);
+  if (field === "grade") return normalizeGrade(value.match(/[A-F][+-]?|P|W|抵/i)?.[0] ?? value);
+  if (field === "score") return value.match(/\d{1,3}|I|W|-/i)?.[0] ?? value;
+  if (field === "emi") return /Y|是|Yes/i.test(value);
+  return value;
+};
+
+const parseNchuMobileLabelValueTranscript = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizePasteText(line))
+    .filter(Boolean);
+  const courses: TranscriptCourse[] = [];
+  let currentCourse: MobileCourseDraft = {};
+  let currentField: keyof MobileCourseDraft | undefined;
+
+  const flushCourse = () => {
+    if (!isValidMobileCourseDraft(currentCourse)) {
+      currentCourse = {};
+      currentField = undefined;
+      return;
+    }
+
+    courses.push(withCourseDefaults({
+      courseNo: currentCourse.courseNo ?? "",
+      semester: currentCourse.semester ?? "",
+      name: currentCourse.name,
+      credits: currentCourse.credits,
+      score: currentCourse.score ?? "",
+      grade: normalizeGrade(currentCourse.grade),
+      type: currentCourse.type ?? "",
+      category: currentCourse.category,
+      offeredBy: currentCourse.offeredBy ?? "",
+      emi: currentCourse.emi ?? false,
+    }, profile));
+    currentCourse = {};
+    currentField = undefined;
+  };
+
+  const assignField = (field: keyof MobileCourseDraft, rawValue: string) => {
+    const normalizedValue = normalizeMobileCourseValue(field, rawValue);
+    if (field === "courseNo" && isValidMobileCourseDraft(currentCourse)) flushCourse();
+    if (field === "credits" && typeof normalizedValue === "number" && Number.isFinite(normalizedValue)) {
+      currentCourse.credits = normalizedValue;
+      return;
+    }
+    if (field === "emi" && typeof normalizedValue === "boolean") {
+      currentCourse.emi = normalizedValue;
+      return;
+    }
+    if (typeof normalizedValue !== "string" || !normalizedValue.trim()) return;
+    const previousValue = currentCourse[field];
+    currentCourse[field] = typeof previousValue === "string" && previousValue
+      ? `${previousValue}${normalizedValue}` as never
+      : normalizedValue as never;
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const nextLine = lines[index + 1] ?? "";
+    const label = getMobileFieldLabel(line, nextLine);
+    if (label.field) {
+      currentField = label.field;
+      index += label.consumedLines - 1;
+      continue;
+    }
+
+    if (!currentField) continue;
+    const nextLabel = getMobileFieldLabel(nextLine, lines[index + 2] ?? "");
+    assignField(currentField, line);
+    if (currentField === "grade" || currentField === "emi" || nextLabel.field) {
+      currentField = undefined;
+    }
+  }
+
+  flushCourse();
+  return courses;
+};
+
+const getParsedCourseKey = (course: TranscriptCourse) =>
+  [
+    course.courseNo && course.courseNo !== "抵" ? course.courseNo : "",
+    course.name.replace(/\s+/g, ""),
+    course.credits,
+    normalizeGrade(course.grade),
+  ].join("|");
+
 export const parsePastedCourses = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
   const structuredCourses = parseStructuredRows(text, profile);
   const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
-  return [...structuredCourses, ...copiedTranscriptCourses];
+  const mobileLabelValueCourses = parseNchuMobileLabelValueTranscript(text, profile);
+  const seen = new Set<string>();
+  return [...structuredCourses, ...copiedTranscriptCourses, ...mobileLabelValueCourses].filter((course) => {
+    const key = getParsedCourseKey(course);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
