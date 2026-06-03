@@ -285,7 +285,10 @@ const createAiAnswer = async (body) => {
 };
 
 export const handler = async (event) => {
-  const rawPath = event.path.split("/.netlify/functions/nchu/")[1] ?? "";
+  const rawPath =
+    event.path.split("/.netlify/functions/nchu/")[1] ??
+    event.path.split("/api/nchu/")[1] ??
+    "";
   const endpoint = rawPath.replace(/^\/+/, "");
   const params = new URLSearchParams(event.rawQuery || "");
 
