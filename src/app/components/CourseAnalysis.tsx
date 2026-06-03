@@ -43,6 +43,7 @@ type ExternalResource = {
   title: string;
   description: string;
   url: string;
+  sourceType?: "live-course" | "search-link";
 };
 
 type ChatMessage = {
@@ -428,6 +429,9 @@ const renderExternalResourceCards = (resources: ExternalResource[]) => {
               </span>
             </div>
             <p className="text-xs leading-5 text-gray-600 dark:text-gray-300">{resource.description}</p>
+            <p className="mt-2 text-[11px] font-medium text-violet-700 dark:text-violet-300">
+              {resource.sourceType === "search-link" ? "Search manually" : "Live result"}
+            </p>
           </a>
         ))}
       </div>
@@ -467,18 +471,21 @@ const buildExternalResources = (topic: string): ExternalResource[] => {
       title: `${topic} 線上課程`,
       description: "適合找結構化課程、作業與證書型學習路線。",
       url: `https://www.coursera.org/search?query=${encodedTopic}`,
+      sourceType: "search-link",
     },
     {
       provider: "edX",
       title: `${topic} 大學與機構課程`,
       description: "適合找大學、企業與國際機構提供的入門或進階課程。",
       url: `https://www.edx.org/search?q=${encodedTopic}`,
+      sourceType: "search-link",
     },
     {
       provider: "YouTube",
       title: `${topic} 教學影片`,
       description: "適合先看示範、快速建立概念，再決定要不要深入。",
       url: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${topic} 入門 教學`)}`,
+      sourceType: "search-link",
     },
   ];
 
@@ -489,12 +496,14 @@ const buildExternalResources = (topic: string): ExternalResource[] => {
         title: `${topic} 免費實作課程`,
         description: "適合用專案和練習題建立寫程式的手感。",
         url: `https://www.freecodecamp.org/search?query=${encodedTopic}`,
+        sourceType: "search-link",
       },
       {
         provider: "Kaggle Learn",
         title: "Python / Data 入門練習",
         description: "適合 Python、資料分析與機器學習的短課程練習。",
         url: "https://www.kaggle.com/learn",
+        sourceType: "search-link",
       },
     );
   } else if (/鋼琴|音樂|樂器|吉他|演奏|piano|music/i.test(normalizedTopic)) {
@@ -504,12 +513,14 @@ const buildExternalResources = (topic: string): ExternalResource[] => {
         title: `${topic} 免費開放課程`,
         description: "適合補充音樂概念、練習方法與基礎理論。",
         url: `https://www.open.edu/openlearn/search-results?search_api_fulltext=${encodedTopic}`,
+        sourceType: "search-link",
       },
       {
         provider: "Class Central",
         title: `${topic} 課程彙整`,
         description: "適合比較多個平台上的免費與付費課程。",
         url: `https://www.classcentral.com/search?q=${encodedTopic}`,
+        sourceType: "search-link",
       },
     );
   } else {
@@ -518,10 +529,24 @@ const buildExternalResources = (topic: string): ExternalResource[] => {
       title: `${topic} 課程彙整`,
       description: "適合一次比較 Coursera、edX 等平台上的課程。",
       url: `https://www.classcentral.com/search?q=${encodedTopic}`,
+      sourceType: "search-link",
     });
   }
 
   return resources.slice(0, MAX_EXTERNAL_RESOURCE_CARDS);
+};
+
+const fetchExternalResources = async (topic: string) => {
+  const fallbackResources = buildExternalResources(topic);
+  try {
+    const response = await fetchWithTimeout(`/api/nchu/external-courses?topic=${encodeURIComponent(topic)}`, {}, 14000);
+    if (!response.ok) return fallbackResources;
+    const data = (await response.json()) as { resources?: ExternalResource[] };
+    const liveResources = (data.resources ?? []).map((resource) => ({ ...resource, sourceType: "live-course" as const }));
+    return liveResources.length > 0 ? liveResources.slice(0, MAX_EXTERNAL_RESOURCE_CARDS) : fallbackResources;
+  } catch {
+    return fallbackResources;
+  }
 };
 
 const getCourseScore = (course: NchuCourse, terms: string[]) => {
@@ -623,7 +648,6 @@ export function CourseAnalysis() {
 
     try {
       const searchTerms = getSearchTerms(nextTopic);
-      const externalResources = buildExternalResources(nextTopic);
       const question = [
         `學生訊息：${nextMessage}`,
         `推定學習主題：${nextTopic}`,
@@ -642,10 +666,11 @@ export function CourseAnalysis() {
         "不要輸出生硬的系統推定欄位。",
       ].join("\n");
 
-      const [sources, courseResults, allEvents] = await Promise.all([
+      const [sources, courseResults, allEvents, externalResources] = await Promise.all([
         shouldUseNchuResources ? fetchOfficialSources(question).catch(() => [] as NchuSource[]) : Promise.resolve([] as NchuSource[]),
         Promise.allSettled(searchTerms.map((term) => fetchCourses(term))),
         fetchEvents().catch(() => [] as NchuEvent[]),
+        fetchExternalResources(nextTopic),
       ]);
       const courseResponses = courseResults
         .filter((result): result is PromiseFulfilledResult<{ term: string; courses: NchuCourse[] }> => result.status === "fulfilled")

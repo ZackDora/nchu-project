@@ -15,6 +15,7 @@ const courseSearchUrl = "https://onepiece.nchu.edu.tw/cofsys/plsql/crseqry_all2"
 const libraryEventsUrl = "https://cal.lib.nchu.edu.tw/";
 const dfllGraduationUrl = "https://dfll.nchu.edu.tw/news_detail.php?Key=224";
 const textDecoder = new TextDecoder("utf-8");
+const maxExternalCourseCards = 6;
 
 const sourceCatalog = [
   {
@@ -82,6 +83,14 @@ const decodeEntities = (value) =>
     .trim();
 
 const stripTags = (value) => decodeEntities(value.replace(/<br\s*\/?>/gi, " / ").replace(/<\/?[^>]+>/g, " "));
+
+const decodeJsonString = (value) => {
+  try {
+    return JSON.parse(`"${value.replace(/"/g, '\\"')}"`);
+  } catch {
+    return value.replace(/\\"/g, '"').replace(/\\\//g, "/");
+  }
+};
 
 const getRelevantLines = (text, patterns, limit = 14) => {
   const lines = text
@@ -246,6 +255,81 @@ const getOfficialSources = async (question) => {
   return sources.slice(0, 4);
 };
 
+const getCourseraCourses = async (topic) => {
+  const response = await fetch(`https://www.coursera.org/search?query=${encodeURIComponent(topic)}`, {
+    headers: { "user-agent": "Mozilla/5.0" },
+  });
+  if (!response.ok) return [];
+  const html = await response.text();
+  const cardMatches = [...html.matchAll(/<a[^>]+href="([^"]+)"[^>]+aria-label="([^"]+)"[^>]*>\s*<h3[^>]*>([\s\S]*?)<\/h3>/gi)];
+  const seen = new Set();
+
+  return cardMatches
+    .map((match) => {
+      const title = stripTags(match[3]);
+      const ariaLabel = decodeEntities(match[2]);
+      const provider = ariaLabel.match(/offered by ([^,]+)/i)?.[1]?.trim() || "Coursera";
+      const type = ariaLabel.split(",").at(-1)?.trim();
+      const url = new URL(match[1].replace(/&amp;/g, "&"), "https://www.coursera.org").toString();
+      return {
+        provider: "Coursera",
+        title,
+        description: `${provider}${type ? ` · ${type}` : ""}`,
+        url,
+      };
+    })
+    .filter((course) => {
+      const key = `${course.provider}-${course.title}-${course.url}`;
+      if (!course.title || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
+};
+
+const getEdxCourses = async (topic) => {
+  const response = await fetch(`https://www.edx.org/search?q=${encodeURIComponent(topic)}`, {
+    headers: { "user-agent": "Mozilla/5.0" },
+  });
+  if (!response.ok) return [];
+  const html = await response.text();
+  const courseMatches = [...html.matchAll(/\{"id":"[^"]+","title":"((?:\\"|[^"])+)","url":"((?:\\"|[^"])+)","owner":\{"key":"[^"]*","name":"((?:\\"|[^"])+)"/g)];
+  const seen = new Set();
+
+  return courseMatches
+    .map((match) => {
+      const title = decodeJsonString(match[1]);
+      const owner = decodeJsonString(match[3]);
+      const url = new URL(decodeJsonString(match[2]), "https://www.edx.org").toString();
+      return {
+        provider: "edX",
+        title,
+        description: owner,
+        url,
+      };
+    })
+    .filter((course) => {
+      const key = `${course.provider}-${course.title}-${course.url}`;
+      if (!course.title || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
+};
+
+const getExternalCourses = async (topic) => {
+  const [courseraResults, edxResults] = await Promise.allSettled([
+    getCourseraCourses(topic),
+    getEdxCourses(topic),
+  ]);
+  const courses = [
+    ...(courseraResults.status === "fulfilled" ? courseraResults.value : []),
+    ...(edxResults.status === "fulfilled" ? edxResults.value : []),
+  ];
+
+  return courses.slice(0, maxExternalCourseCards);
+};
+
 const getRequestBody = (req) =>
   new Promise((resolve, reject) => {
     const chunks = [];
@@ -335,6 +419,12 @@ const handleApi = async (req, res, requestUrl) => {
     if (requestUrl.pathname === "/api/nchu/official-sources") {
       const question = requestUrl.searchParams.get("question")?.trim() || "";
       sendJson(res, 200, { sources: await getOfficialSources(question) });
+      return true;
+    }
+
+    if (requestUrl.pathname === "/api/nchu/external-courses") {
+      const topic = requestUrl.searchParams.get("topic")?.trim() || "learning";
+      sendJson(res, 200, { resources: await getExternalCourses(topic) });
       return true;
     }
 
