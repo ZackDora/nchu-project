@@ -7,6 +7,8 @@ const manualSteps = [
     description: "先到中興大學入口網站登入。",
     link: "https://portal.nchu.edu.tw/",
     linkLabel: "開啟 NCHU Portal",
+    image: `${import.meta.env.BASE_URL}manual-step-1.png`,
+    imageAlt: "NCHU Portal 登入畫面",
   },
   {
     icon: MousePointerClick,
@@ -67,9 +69,18 @@ export function InstructionManual() {
                       <ExternalLink size={15} />
                     </a>
                   )}
-                  <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-400">
-                    圖片位置
-                  </div>
+                  {step.image ? (
+                    <img
+                      src={step.image}
+                      alt={step.imageAlt}
+                      className="mt-4 w-full rounded-lg border border-gray-200 bg-gray-50 object-contain shadow-sm dark:border-gray-700 dark:bg-gray-900"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-400">
+                      圖片位置
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
