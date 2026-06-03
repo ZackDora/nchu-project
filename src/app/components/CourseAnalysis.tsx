@@ -5,7 +5,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
-import { getLearningSearchTerms, normalizeLearningTopic } from "../utils/learningTopic";
+import { getLearningSearchTerms, hasLearningIntent, normalizeLearningTopic } from "../utils/learningTopic";
 
 type NchuCourse = {
   code: string;
@@ -69,6 +69,15 @@ const safetyRedirectText = [
   "I can’t help with that request.",
   "",
   "This tool is for learning planning, school resources, and skill development. Please rephrase it as a safe learning goal.",
+].join("\n");
+const clarifyLearningGoalText = [
+  "我還沒有看到明確的學習目標。",
+  "",
+  "請直接告訴我你想學什麼、目前程度，或想達成什麼成果。例如：",
+  "",
+  "- 我想學人工智慧，完全新手",
+  "- 我想加強微積分，準備期中考",
+  "- 我想找 NCHU 有沒有鋼琴相關課程",
 ].join("\n");
 
 const unsafeRequestPatterns = [
@@ -659,6 +668,17 @@ export function CourseAnalysis() {
         ...current,
         { role: "user", text: nextMessage },
         { role: "assistant", text: safetyRedirectText },
+      ]);
+      return;
+    }
+
+    if (!hasLearningIntent(nextMessage)) {
+      setChatInput("");
+      setHasGenerated(true);
+      setMessages((current) => [
+        ...current,
+        { role: "user", text: nextMessage },
+        { role: "assistant", text: clarifyLearningGoalText },
       ]);
       return;
     }

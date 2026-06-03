@@ -8,6 +8,15 @@ const safetyRedirectText = [
   "",
   "This tool is for learning planning, school resources, and skill development. Please rephrase it as a safe learning goal.",
 ].join("\n");
+const clarifyLearningGoalText = [
+  "我還沒有看到明確的學習目標。",
+  "",
+  "請直接告訴我你想學什麼、目前程度，或想達成什麼成果。例如：",
+  "",
+  "- 我想學人工智慧，完全新手",
+  "- 我想加強微積分，準備期中考",
+  "- 我想找 NCHU 有沒有鋼琴相關課程",
+].join("\n");
 const unsafeRequestPatterns = [
   /(?:how|teach|show|help).{0,40}(?:kill|stab|shoot|poison|bomb|weapon|explosive)/i,
   /(?:製作|教我|如何).{0,20}(?:炸彈|武器|毒藥|殺人|傷害)/,
@@ -20,6 +29,19 @@ const unsafeRequestPatterns = [
   /(?:api key|password|private key|secret|token|密碼|金鑰|權杖).{0,30}(?:steal|reveal|extract|偷|取得|破解)/i,
 ];
 const isUnsafeLearningRequest = (message) => unsafeRequestPatterns.some((pattern) => pattern.test(message));
+const learningIntentPatterns = [
+  /(?:我想|想要|想|我要|請幫我|幫我|我對|對).{0,30}(?:學|學習|入門|開始|提高|加強|改善|補強|精進|提升|練習|複習|準備|興趣|感興趣)/i,
+  /(?:怎麼|如何|要怎樣|該怎麼辦).{0,30}(?:學|學習|入門|開始|提高|加強|改善|補強|精進|提升|練習|複習|準備)/i,
+  /(?:learn|study|practice|improve|prepare|start|begin|get better at|interested in).{0,40}\w/i,
+  /(?:課程|學習計畫|讀書計畫|入門路線|練習方式|推薦).{0,30}(?:嗎|呢|怎麼|如何|給|建議|安排|找|查|course|plan)/i,
+  /(?:有沒有|有哪些|找|查|推薦).{0,40}(?:課程|活動|資源|course|activity|resource)/i,
+  /(?:課程|活動|資源|course|activity|resource).{0,40}(?:有沒有|哪些|推薦|找|查)/i,
+];
+const hasLearningIntent = (message) => {
+  const compactMessage = message.trim();
+  return Boolean(compactMessage) && learningIntentPatterns.some((pattern) => pattern.test(compactMessage));
+};
+const extractStudentMessage = (question) => question.match(/學生訊息：([^\n]+)/)?.[1]?.trim() || question.trim();
 
 const sourceCatalog = [
   {
@@ -336,9 +358,11 @@ const getExternalCourses = async (topic) => {
 
 const createAiAnswer = async (body) => {
   const payload = JSON.parse(body || "{}");
-  if (isUnsafeLearningRequest(payload.question ?? "")) {
+  const studentMessage = extractStudentMessage(payload.question ?? "");
+  if (isUnsafeLearningRequest(studentMessage)) {
     return safetyRedirectText;
   }
+  if (!hasLearningIntent(studentMessage)) return clarifyLearningGoalText;
 
   const apiKey = process.env.GROQ_API_KEY;
   const model = process.env.GROQ_MODEL || "qwen/qwen3-32b";

@@ -21,6 +21,28 @@ const improvementVerbPattern = /^(提高|加強|改善|補強|精進|提升|練�
 const trailingIntentPattern =
   /(有興趣|感興趣|想開始|想入門|要怎樣|該怎麼辦|怎麼辦|怎麼學|如何開始|要如何開始|要開始學習要怎樣)\s*$/i;
 
+const learningIntentPatterns = [
+  /(?:我想|想要|想|我要|請幫我|幫我|我對|對).{0,30}(?:學|學習|入門|開始|提高|加強|改善|補強|精進|提升|練習|複習|準備|興趣|感興趣)/i,
+  /(?:怎麼|如何|要怎樣|該怎麼辦).{0,30}(?:學|學習|入門|開始|提高|加強|改善|補強|精進|提升|練習|複習|準備)/i,
+  /(?:learn|study|practice|improve|prepare|start|begin|get better at|interested in).{0,40}\w/i,
+  /(?:課程|學習計畫|讀書計畫|入門路線|練習方式|推薦).{0,30}(?:嗎|呢|怎麼|如何|給|建議|安排|找|查|course|plan)/i,
+  /(?:有沒有|有哪些|找|查|推薦).{0,40}(?:課程|活動|資源|course|activity|resource)/i,
+  /(?:課程|活動|資源|course|activity|resource).{0,40}(?:有沒有|哪些|推薦|找|查)/i,
+];
+
+const nonLearningFeedbackPatterns = [
+  /(?:垃圾|爛|廢|白痴|笨|沒用|不會給|看不懂|搞什麼|抱怨|投訴|bad|stupid|useless|trash|terrible)/i,
+];
+
+export const hasLearningIntent = (message: string) => {
+  const compactMessage = message.trim();
+  if (!compactMessage) return false;
+  if (nonLearningFeedbackPatterns.some((pattern) => pattern.test(compactMessage))) {
+    return learningIntentPatterns.some((pattern) => pattern.test(compactMessage));
+  }
+  return learningIntentPatterns.some((pattern) => pattern.test(compactMessage));
+};
+
 export const normalizeLearningTopic = (message: string) => {
   const compactMessage = message.trim();
   const alias = subjectAliases.find((subject) => subject.patterns.some((pattern) => pattern.test(compactMessage)));
