@@ -7,13 +7,28 @@ const manualSteps = [
     description: "先到中興大學入口網站登入。",
     link: "https://portal.nchu.edu.tw/",
     linkLabel: "開啟 NCHU Portal",
-    image: `${import.meta.env.BASE_URL}manual-step-1.png`,
-    imageAlt: "NCHU Portal 登入畫面",
+    images: [
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-1.png`,
+        alt: "NCHU Portal 登入畫面",
+      },
+    ],
   },
   {
     icon: MousePointerClick,
     title: "進入教務資訊系統",
     description: "登入後，從 Portal 進入「教務資訊系統」。",
+    images: [
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-2-1.png`,
+        alt: "教務資訊系統首頁",
+      },
+      {
+        src: `${import.meta.env.BASE_URL}manual-step-2-2.png`,
+        alt: "教務資訊系統左側選單中的歷年成績位置",
+        narrow: true,
+      },
+    ],
   },
   {
     icon: FileText,
@@ -69,13 +84,20 @@ export function InstructionManual() {
                       <ExternalLink size={15} />
                     </a>
                   )}
-                  {step.image ? (
-                    <img
-                      src={step.image}
-                      alt={step.imageAlt}
-                      className="mt-4 w-full rounded-lg border border-gray-200 bg-gray-50 object-contain shadow-sm dark:border-gray-700 dark:bg-gray-900"
-                      loading="lazy"
-                    />
+                  {step.images ? (
+                    <div className="mt-4 grid gap-3">
+                      {step.images.map((image) => (
+                        <img
+                          key={image.src}
+                          src={image.src}
+                          alt={image.alt}
+                          className={`w-full rounded-lg border border-gray-200 bg-gray-50 object-contain shadow-sm dark:border-gray-700 dark:bg-gray-900 ${
+                            image.narrow ? "sm:max-w-sm" : ""
+                          }`}
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
                   ) : (
                     <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-400">
                       圖片位置
