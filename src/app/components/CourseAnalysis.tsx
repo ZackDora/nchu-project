@@ -783,29 +783,28 @@ export function CourseAnalysis() {
 
   return (
     <div className="flex h-[calc(100dvh-4.25rem)] min-h-[560px] flex-col bg-gray-50 dark:bg-gray-900">
-      <header className="shrink-0 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
+      <header className="shrink-0 border-b border-gray-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
-              <BrainCircuit className="text-white" size={20} />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
+              <BrainCircuit className="text-white" size={18} />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white">AI 學習規劃</h1>
-              <p className="hidden text-sm text-gray-500 dark:text-gray-400 sm:block">直接聊天，整理方向、路線與下一步。</p>
+              <h1 className="truncate text-base font-semibold text-gray-900 dark:text-white">AI 學習規劃</h1>
             </div>
           </div>
           <span className="shrink-0 rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
             {isAiLoading ? "正在思考" : hasGenerated ? "可繼續追問" : "等待問題"}
           </span>
         </div>
-        <div className="mx-auto mt-3 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100 sm:text-sm">
-          AI 內容可能有錯，請用 NCHU 官方課程查詢、系所公告或授課教師資訊再次確認。此頁目前使用 Groq API，模型以伺服器設定為準；每次回答下方會顯示實際模型。限制：它不是官方學務建議，NCHU 資源只涵蓋已接上的課程查詢、圖書館活動與官方來源摘要，且免費 API 可能有速率或額度限制。
-        </div>
       </header>
 
       <main className="min-h-0 flex-1 overflow-hidden">
         <div className="mx-auto flex h-full max-w-4xl flex-col">
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6 md:py-8">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+            AI 內容可能有錯，請再次確認 NCHU 官方課程查詢、系所公告或授課教師資訊。模型：Groq，實際模型會顯示在每次回答下方；限制：非官方學務建議，免費 API 可能有額度或速率限制。
+          </div>
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
