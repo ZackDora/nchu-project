@@ -80,14 +80,35 @@ export function CourseTable({
             {chronologicalCourseRows.map(({ course, index }) => {
               const creditStatus = getCourseCreditStatus(course);
               return (
-                <div
+                <details
                   key={index}
-                  className={`rounded-lg border p-3 ${
+                  className={`rounded-lg border ${
                     creditStatus.isUncounted
                       ? "border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30"
                       : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
                   }`}
                 >
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-3 marker:hidden">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{course.name || "未命名課程"}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        {course.courseNo && <span>{course.courseNo}</span>}
+                        <span>{course.semester || "未選學期"}</span>
+                        <span>{course.credits || 0} 學分</span>
+                        {course.grade && <span>{course.grade}</span>}
+                      </div>
+                      {creditStatus.note && (
+                        <p className={`mt-1 text-xs ${creditStatus.isUncounted ? "text-red-700 dark:text-red-300" : "text-gray-500 dark:text-gray-400"}`}>
+                          {creditStatus.note}
+                        </p>
+                      )}
+                    </div>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                      編輯
+                    </span>
+                  </summary>
+
+                  <div className="border-t border-gray-100 p-3 dark:border-gray-700">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <label className={labelClass}>課程名稱</label>
@@ -247,7 +268,8 @@ export function CourseTable({
                     {creditStatus.note}
                   </p>
                 )}
-              </div>
+                  </div>
+                </details>
             );
             })}
           </div>

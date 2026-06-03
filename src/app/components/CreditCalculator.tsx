@@ -689,20 +689,20 @@ export function CreditCalculator() {
   };
 
   return (
-    <div className="mx-auto max-w-[1600px] px-3 py-4 pb-24 sm:px-4 lg:px-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-[1600px] px-3 py-3 pb-24 sm:px-4 sm:py-4 lg:px-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4 sm:gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 dark:bg-blue-500">
             <Calculator className="text-white" size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white sm:text-xl">剩餘學分計算</h1>
+            <h1 className="truncate text-base font-semibold text-gray-900 dark:text-white sm:text-xl">剩餘學分計算</h1>
             <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
               {selectedDepartment || "未選擇系所"} / {admissionYear} 入學
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 sm:px-3">
           <span className="font-medium text-gray-900 dark:text-white">{primaryCompleted}</span>
           <span>/ {primaryPlan?.requiredCredits ?? 128} 學分</span>
         </div>
@@ -710,7 +710,7 @@ export function CreditCalculator() {
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
-          <div className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
+          <div className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800 sm:p-4">
             <label className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">主修系所</label>
             <select
               value={selectedDepartment}
@@ -763,7 +763,7 @@ export function CreditCalculator() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800 sm:p-4">
             <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">畢業條件方案</p>
@@ -821,7 +821,7 @@ export function CreditCalculator() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors dark:border-gray-700 dark:bg-gray-800 sm:p-4">
             <div className="flex items-center gap-2 mb-3">
               <ClipboardPaste size={18} className="text-blue-600 dark:text-blue-400" />
               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">貼上課程資料</p>
@@ -829,8 +829,8 @@ export function CreditCalculator() {
             <textarea
               value={pasteText}
               onChange={(event) => setPasteText(event.target.value)}
-              placeholder="請複製 學生歷年成績查詢 的內容"
-              className="min-h-28 w-full resize-y px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm transition-colors"
+              placeholder="貼上手機或電腦複製的歷年成績內容"
+              className="min-h-44 w-full resize-y px-3 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-base leading-6 transition-colors sm:min-h-28 sm:py-2 sm:text-sm"
             />
             <div className="mt-3 grid gap-3 sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:items-center">
               <label className="grid gap-1 text-sm text-gray-700 dark:text-gray-300 sm:inline-flex sm:items-center sm:gap-2">
@@ -838,7 +838,7 @@ export function CreditCalculator() {
                 <select
                   value={pasteSemester}
                   onChange={(event) => setPasteSemester(event.target.value)}
-                  className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:w-auto sm:px-2 sm:py-1.5 sm:text-sm"
                 >
                   {semesterOptions.map((semester) => (
                     <option key={semester} value={semester}>{semester}</option>
@@ -847,12 +847,16 @@ export function CreditCalculator() {
               </label>
               <button
                 onClick={importPaste}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white active:bg-blue-700 dark:bg-blue-500 dark:active:bg-blue-600 sm:w-auto"
               >
                 <ClipboardPaste size={16} />
                 匯入貼上的課程
               </button>
-              {pasteMessage && <p className="min-w-0 text-sm text-gray-600 dark:text-gray-400">{pasteMessage}</p>}
+              {pasteMessage && (
+                <p className="min-w-0 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:bg-gray-900/50 dark:text-gray-300">
+                  {pasteMessage}
+                </p>
+              )}
             </div>
           </div>
 
