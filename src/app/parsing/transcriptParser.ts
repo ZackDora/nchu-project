@@ -544,6 +544,9 @@ const getParseQualityScore = (course: TranscriptCourse) => {
   ].reduce((sum, score) => sum + score, 0);
 };
 
+const hasImportableCourseName = (course: TranscriptCourse) =>
+  !/^(Req|Elec|Gen|P\.?E\.?|Service)$/i.test(course.name.trim());
+
 export const parsePastedCourses = (text: string, profile: RequirementProfile): TranscriptCourse[] => {
   const structuredCourses = parseStructuredRows(text, profile);
   const copiedTranscriptCourses = parseNchuCopiedTranscript(text, profile);
@@ -551,7 +554,7 @@ export const parsePastedCourses = (text: string, profile: RequirementProfile): T
   const mobileWrappedTableCourses = parseNchuMobileWrappedTableTranscript(text, profile);
   const mobileCompactCourses = parseNchuMobileCompactTranscript(text, profile);
   const nchuCourses = [...copiedTranscriptCourses, ...mobileLabelValueCourses, ...mobileWrappedTableCourses, ...mobileCompactCourses];
-  const candidateCourses = nchuCourses.length > 0 ? nchuCourses : structuredCourses;
+  const candidateCourses = (nchuCourses.length > 0 ? nchuCourses : structuredCourses).filter(hasImportableCourseName);
   const bestCourses = new Map<string, TranscriptCourse>();
 
   for (const course of candidateCourses) {

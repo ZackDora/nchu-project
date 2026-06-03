@@ -447,7 +447,7 @@ Language Center
 抵 通
 Gen
 大一英文
-Freshman English - - 2 抵
+Freshman English - - 2 抵 -
 `;
 
   const narrowWrappedCourses = parsePastedCourses(narrowWrappedTranscript, profile);
