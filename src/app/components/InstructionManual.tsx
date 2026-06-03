@@ -63,6 +63,7 @@ const manualSteps = [
     icon: PencilLine,
     title: "貼上並人工核對",
     description: "回到學分計算頁，把內容貼到匯入框。匯入後請檢查課程、學分、成績與分類；若有錯誤可以手動編輯。",
+    hideImagePlaceholder: true,
   },
 ];
 
@@ -117,7 +118,7 @@ export function InstructionManual() {
                         />
                       ))}
                     </div>
-                  ) : (
+                  ) : step.hideImagePlaceholder ? null : (
                     <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-6 text-center text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-400">
                       圖片位置
                     </div>
