@@ -103,9 +103,40 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
   ];
 
   const isCourseStart = (line: string) => /^([A-Z]?\d{4,6}|抵)\s*(必|選|通|體|服|Req|Elec|Gen|P\.?E\.?|Service)?$/i.test(line);
-  const scoreMatch = (line: string) =>
-    line.match(/^([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s*([A-F][+-]?|P|W|抵|-)\s*([YN-])(?:\s+.*)?$/i) ??
-    line.match(/(?:^|\s)([0-6](?:\.[05])?)\s*(抵)$/i);
+  const parseScoreLine = (line: string) => {
+    const fullMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s+([YN-])(?:\s|$)/i);
+    if (fullMatch) {
+      return {
+        credits: Number(fullMatch[1]),
+        score: fullMatch[2],
+        grade: normalizeGrade(fullMatch[3]),
+        emi: fullMatch[4]?.toUpperCase() === "Y",
+      };
+    }
+
+    const noGpaMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s+(P|I|W|抵|-)\s+([YN-])(?:\s|$)/i);
+    if (noGpaMatch) {
+      const score = noGpaMatch[2];
+      return {
+        credits: Number(noGpaMatch[1]),
+        score,
+        grade: score === "抵" ? "抵" : "-",
+        emi: noGpaMatch[3]?.toUpperCase() === "Y",
+      };
+    }
+
+    const transferMatch = line.match(/(?:^|\s)([0-6](?:\.[05])?)\s*(抵)(?:\s|$)/i);
+    if (transferMatch) {
+      return {
+        credits: Number(transferMatch[1]),
+        score: "",
+        grade: "抵",
+        emi: false,
+      };
+    }
+
+    return undefined;
+  };
   const compactLine = (line: string) => line.replace(/\s+/g, "");
   const cleanOfferedBy = (line: string) =>
     line.match(/([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? line;
@@ -136,10 +167,11 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
     if (currentBlock.length === 0) return;
     const block = currentBlock;
     currentBlock = [];
+    if (/^(Req|Elec|Gen|P\.?E\.?|Service)\s+/i.test(block[1] ?? "")) return;
 
-    const scoreLine = block.find((line) => scoreMatch(line));
-    const matchedScore = scoreLine ? scoreMatch(scoreLine) : undefined;
-    if (!matchedScore) return;
+    const scoreLine = block.find((line) => parseScoreLine(line));
+    const scoreData = scoreLine ? parseScoreLine(scoreLine) : undefined;
+    if (!scoreData) return;
 
     const startMatch = block[0].match(/^([A-Z]?\d{4,6}|抵)\s*(必|選|通|體|服)?/);
     const chineseLines = block
@@ -171,12 +203,12 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
       type: startMatch?.[2] ?? "",
       semester: "",
       name,
-      credits: Number(matchedScore[1]),
-      score: matchedScore[3] ? matchedScore[2] : "",
-      grade: normalizeGrade(matchedScore[3] ?? matchedScore[2]),
+      credits: scoreData.credits,
+      score: scoreData.score,
+      grade: scoreData.grade,
       category: category ?? inferCategory(name, profile, offeredBy),
       offeredBy: offeredBy ?? "",
-      emi: matchedScore[4]?.toUpperCase() === "Y",
+      emi: scoreData.emi,
     }, profile));
   };
 
@@ -189,7 +221,7 @@ const parseNchuCopiedTranscript = (text: string, profile: RequirementProfile): T
 
     if (currentBlock.length > 0) {
       currentBlock.push(line);
-      if (scoreMatch(line)) flushBlock();
+      if (parseScoreLine(line)) flushBlock();
     }
   }
 
@@ -334,7 +366,7 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
   const courses: TranscriptCourse[] = [];
   const typePattern = "(必|選|通|體|服|Req|Elec|Gen|P\\.?E\\.?|Service)";
   const startPattern = new RegExp(`^([A-Z]?\\d{4,6}|抵)\\s+${typePattern}$`, "i");
-  const scorePattern = /^(.+?)\s+([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|-)\s+([A-F][+-]?|P|W|抵|-)\s*([YN-])?)?$/i;
+  const scorePattern = /^(.+?)\s+([0-6](?:\.[05])?)(?:\s+(\d{1,3}|I|W|P|抵|-)(?:\s+([A-F][+-]?|P|W|抵|-))?\s+([YN-]))?$/i;
   const normalizeCourseType = (value: string) => {
     const matchedType = value.match(/必|選|通|體|服/)?.[0];
     return matchedType ?? "";
@@ -346,18 +378,30 @@ const parseNchuMobileWrappedTableTranscript = (text: string, profile: Requiremen
 
     const type = normalizeCourseType(startMatch[2] ?? "");
     const nameLine = lines[index + 1] ?? "";
-    const categoryLine = lines[index + 2] ?? "";
-    const offeredByLine = lines[index + 3] ?? "";
-    const detailLine = lines[index + 4] ?? "";
     const name = nameLine.replace(/^(Req|Elec|Gen|P\.?E\.?|Service)\s+/i, "").trim();
-    const category = categoryLine.match(/\s(人文領域|社會科學領域|自然科學領域|統合領域|核心素養|資訊素養|全校可選修|專業領域微課程|體育)$/)?.[1] ?? "";
-    const offeredBy = offeredByLine.match(/\s([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? "";
+    const nextStartIndex = lines.findIndex((line, lineIndex) => lineIndex > index && startPattern.test(line));
+    const blockEnd = nextStartIndex >= 0 ? nextStartIndex : lines.length;
+    const detailIndex = lines.findIndex((line, lineIndex) => lineIndex > index + 1 && lineIndex < blockEnd && scorePattern.test(line));
+    if (detailIndex < 0) continue;
+
+    const detailLine = lines[detailIndex] ?? "";
     const detailMatch = detailLine.match(scorePattern);
     if (!name || !detailMatch) continue;
+    const metadataLines = lines.slice(index + 2, detailIndex);
+    const metadataText = metadataLines.join(" ");
+    const category = metadataText.match(/(?:^|\s)(人文領域|社會科學領域|自然科學領域|統合領域|核心素養|資訊素養|全校可選修|全校英外語|外國語文|敘事表達\/大學國文|專業領域微課程|體育)(?:\s|$)/)?.[1] ?? "";
+    const offeredByLine = [...metadataLines].reverse().find((line) => /(?:^|\s)([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/.test(line)) ?? "";
+    const offeredBy = offeredByLine.match(/(?:^|\s)([\u4e00-\u9fff]*(?:體育室|學務處|中心|學程|系|所|院))$/)?.[1] ?? "";
 
     const credits = Number(detailMatch[2]);
-    const grade = detailMatch[4] ? normalizeGrade(detailMatch[4]) : "";
-    if (!credits || !grade) continue;
+    const grade = detailMatch[4]
+      ? normalizeGrade(detailMatch[4])
+      : detailMatch[3] === "抵"
+        ? "抵"
+        : detailMatch[3]
+          ? "-"
+          : "";
+    if (!Number.isFinite(credits) || (credits > 0 && !grade)) continue;
 
     courses.push(withCourseDefaults({
       courseNo: startMatch[1] === "抵" ? "" : startMatch[1],
